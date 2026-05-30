@@ -1,0 +1,2389 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CharaMemo">
+<title>CharaMemo</title>
+<style>
+:root {
+  --bg-0:#0a0a0f;--bg-1:#111118;--bg-2:#1a1a24;--bg-3:#22222f;--bg-4:#2a2a3a;
+  --border:#2e2e42;--border-light:#3a3a52;
+  --text-0:#e8e8f0;--text-1:#b0b0c8;--text-2:#6a6a88;
+  --accent:#7c6af5;--accent-dim:#4a3fa0;--accent-glow:rgba(124,106,245,0.15);
+  --danger:#e05555;--danger-dim:#7a2020;--success:#4ec994;--warning:#e09440;
+  --radius:10px;--radius-sm:6px;--transition:0.18s ease;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;width:100%;background:var(--bg-0);color:var(--text-0);font-family:'Noto Sans JP','Hiragino Sans',sans-serif;font-size:15px;overflow:hidden;}
+#app{height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+
+/* HEADER */
+.header{background:var(--bg-1);border-bottom:1px solid var(--border);padding:env(safe-area-inset-top,12px) 16px 12px;display:flex;align-items:center;gap:10px;min-height:56px;flex-shrink:0;}
+.header-title{flex:1;font-size:17px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.header-logo{font-size:13px;color:var(--accent);letter-spacing:0.1em;font-weight:700;flex-shrink:0;}
+.btn-icon{width:38px;height:38px;border-radius:var(--radius-sm);background:var(--bg-3);border:1px solid var(--border);color:var(--text-1);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.btn-icon:active{background:var(--bg-4);}
+
+/* SCREENS */
+.screen{display:none;flex-direction:column;flex:1;overflow:hidden;}
+.screen.active{display:flex;}
+.scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px;}
+.scroll-area::-webkit-scrollbar{display:none;}
+
+/* BOTTOM */
+.bottom-bar{background:var(--bg-1);border-top:1px solid var(--border);padding:12px 16px calc(env(safe-area-inset-bottom,0px) + 12px);flex-shrink:0;display:flex;gap:10px;}
+.search-bar{padding:10px 16px calc(env(safe-area-inset-bottom,0px) + 10px);background:var(--bg-1);border-top:1px solid var(--border);flex-shrink:0;}
+
+/* BUTTONS */
+.btn{padding:10px 16px;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:6px;font-family:inherit;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:active{background:var(--accent-dim);}
+.btn-secondary{background:var(--bg-3);border:1px solid var(--border-light);color:var(--text-1);}
+.btn-secondary:active{background:var(--bg-4);}
+.btn-danger{background:var(--danger-dim);border:1px solid var(--danger);color:var(--danger);}
+.btn-full{width:100%;}
+.btn-sm{padding:7px 12px;font-size:13px;}
+
+/* CARDS */
+.card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;cursor:pointer;}
+.card:active{background:var(--bg-3);border-color:var(--accent);}
+.card-title{font-size:15px;font-weight:500;margin-bottom:4px;}
+.card-sub{font-size:12px;color:var(--text-2);}
+.card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.tag-chip{background:var(--bg-4);border:1px solid var(--border-light);color:var(--text-1);font-size:11px;padding:2px 8px;border-radius:20px;}
+
+/* MEMO CARD WITH COVER */
+.memo-card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;cursor:pointer;display:flex;align-items:stretch;overflow:hidden;position:relative;}
+.memo-card:active{border-color:var(--accent);}
+.memo-card-cover{width:72px;height:72px;flex-shrink:0;background:var(--bg-3);display:flex;align-items:center;justify-content:center;overflow:hidden;margin:10px 0 10px 10px;border-radius:10px;}
+.memo-card-cover img{width:100%;height:100%;object-fit:cover;border-radius:10px;}
+.memo-card-cover-placeholder{font-size:22px;color:var(--text-2);}
+.memo-card-body{flex:1;padding:12px 14px;min-width:0;}
+.memo-card-actions{display:flex;flex-direction:column;justify-content:center;gap:4px;padding:8px 10px 8px 0;flex-shrink:0;}
+.drag-handle{width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--text-2);font-size:18px;cursor:grab;user-select:none;}
+.drag-handle:active{cursor:grabbing;}
+
+/* EMPTY */
+.empty{text-align:center;padding:60px 20px;color:var(--text-2);}
+.empty-icon{font-size:40px;margin-bottom:12px;}
+.empty-text{font-size:14px;line-height:1.7;}
+
+/* FORM */
+.field-group{margin-bottom:16px;}
+.field-label{font-size:12px;font-weight:500;color:var(--text-2);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;display:block;}
+.field-input,.field-textarea,.field-select{width:100%;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-0);font-family:inherit;font-size:15px;padding:10px 12px;outline:none;-webkit-appearance:none;}
+.field-input:focus,.field-textarea:focus,.field-select:focus{border-color:var(--accent);}
+.field-input::placeholder,.field-textarea::placeholder{color:var(--text-2);}
+.field-textarea{resize:vertical;min-height:100px;line-height:1.7;}
+.field-select option{background:var(--bg-3);}
+
+/* MODE TOGGLE */
+.mode-toggle{display:flex;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;flex-shrink:0;}
+.mode-btn{padding:8px 14px;font-size:13px;font-weight:500;color:var(--text-2);cursor:pointer;border:none;background:none;font-family:inherit;}
+.mode-btn.active{background:var(--accent);color:#fff;}
+
+/* SEARCH */
+.search-input-wrap{position:relative;}
+.search-input{width:100%;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-0);font-family:inherit;font-size:14px;padding:9px 12px 9px 36px;outline:none;-webkit-appearance:none;}
+.search-input:focus{border-color:var(--accent);}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-2);font-size:16px;pointer-events:none;}
+
+/* INDEX */
+.index-options{display:flex;flex-wrap:wrap;gap:8px;}
+.index-chip{padding:7px 14px;border-radius:20px;font-size:13px;border:1px solid var(--border-light);background:var(--bg-3);color:var(--text-1);cursor:pointer;}
+.index-chip.selected{background:var(--accent-glow);border-color:var(--accent);color:var(--accent);}
+.index-chip.readonly{cursor:default;}
+
+/* TAG INPUT */
+.tag-input-area{background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;display:flex;flex-wrap:wrap;gap:6px;}
+.tag-input-area input{border:none;background:transparent;color:var(--text-0);font-family:inherit;font-size:14px;outline:none;min-width:80px;flex:1;padding:2px 4px;}
+.tag-item{background:var(--bg-4);border:1px solid var(--border-light);color:var(--text-1);font-size:12px;padding:3px 8px;border-radius:14px;display:flex;align-items:center;gap:4px;}
+.tag-remove{color:var(--text-2);cursor:pointer;font-size:14px;line-height:1;}
+
+/* LINK CHIPS */
+.link-chip{background:var(--accent-glow);border:1px solid var(--accent);color:var(--accent);font-size:12px;padding:3px 10px;border-radius:14px;display:flex;align-items:center;gap:6px;cursor:pointer;}
+.link-chip-name{font-size:12px;}
+.link-chip-remove{color:var(--accent);font-size:14px;line-height:1;opacity:0.7;}
+.link-chip-view{background:var(--accent-glow);border:1px solid var(--accent);color:var(--accent);font-size:12px;padding:4px 12px;border-radius:14px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;}
+
+/* AUTOSAVE */
+.autosave{font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:5px;}
+.autosave.saved{color:var(--success);}
+.autosave-dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+/* BADGE */
+.badge{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;letter-spacing:0.05em;}
+.badge-text{background:rgba(78,201,148,0.15);color:var(--success);border:1px solid rgba(78,201,148,0.3);}
+.badge-index{background:rgba(124,106,245,0.15);color:var(--accent);border:1px solid rgba(124,106,245,0.3);}
+.badge-image{background:rgba(224,148,64,0.15);color:var(--warning);border:1px solid rgba(224,148,64,0.3);}
+.badge-export{background:rgba(224,148,64,0.15);color:var(--warning);border:1px solid rgba(224,148,64,0.3);}
+.badge-section{background:rgba(124,106,245,0.1);color:var(--accent);border:1px solid rgba(124,106,245,0.2);}
+.badge-list{background:rgba(78,201,148,0.1);color:#4ec994;border:1px solid rgba(78,201,148,0.3);}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:flex-end;justify-content:center;}
+.modal-overlay.active{display:flex;}
+.modal{background:var(--bg-2);border:1px solid var(--border);border-radius:18px 18px 0 0;width:100%;max-height:92dvh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,16px);animation:slideUp 0.25s ease;}
+@keyframes slideUp{from{transform:translateY(100%);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.modal-handle{width:36px;height:4px;background:var(--border-light);border-radius:2px;margin:10px auto 0;flex-shrink:0;}
+.modal-header{padding:14px 18px 10px;font-size:16px;font-weight:500;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;}
+.modal-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 18px 10px;}
+.modal-body::-webkit-scrollbar{display:none;}
+.modal-footer{padding:10px 18px 0;display:flex;gap:10px;flex-shrink:0;}
+
+/* OUTPUT */
+.output-text{background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-all;max-height:50dvh;overflow-y:auto;}
+
+/* TOAST */
+#toast{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 80px);left:50%;transform:translateX(-50%);background:var(--bg-4);border:1px solid var(--border-light);color:var(--text-0);font-size:13px;padding:10px 18px;border-radius:20px;z-index:999;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap;}
+#toast.show{opacity:1;}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:12px 0;}
+
+/* CHECKBOX */
+.check-row{display:flex;align-items:center;gap:10px;padding:10px 0;}
+.check-row label{font-size:14px;color:var(--text-1);cursor:pointer;flex:1;}
+input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
+
+/* MEMO DETAIL */
+.memo-title-input{font-size:20px;font-weight:700;background:transparent;border:none;border-bottom:2px solid var(--border);color:var(--text-0);font-family:inherit;width:100%;outline:none;padding:6px 0;margin-bottom:16px;}
+.memo-title-input:focus{border-bottom-color:var(--accent);}
+.memo-title-view{font-size:20px;font-weight:700;padding:6px 0;margin-bottom:16px;border-bottom:2px solid var(--border);}
+.memo-cover-area{margin-bottom:16px;display:flex;justify-content:center;}
+.memo-cover-img{width:160px;height:160px;object-fit:cover;border-radius:20px;border:1px solid var(--border);}
+.memo-cover-placeholder{width:100%;height:80px;background:var(--bg-3);border:2px dashed var(--border-light);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-2);font-size:13px;cursor:pointer;}
+
+/* SECTION BLOCKS */
+.section-block{margin-bottom:16px;}
+.section-label{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:0.06em;padding:8px 14px;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;}
+.section-label.collapsed{border-radius:var(--radius);border-bottom:1px solid var(--border);}
+.section-label-arrow{font-size:10px;opacity:0.7;transition:transform 0.2s;display:inline-block;}
+.section-label.collapsed .section-label-arrow{transform:rotate(-90deg);}
+.section-fields{border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);overflow:hidden;}
+.section-fields.collapsed{display:none;}
+.field-block{border-bottom:1px solid var(--border);}
+.field-block:last-child{border-bottom:none;}
+.field-block-header{padding:8px 14px;font-size:11px;font-weight:700;color:var(--text-2);letter-spacing:0.07em;text-transform:uppercase;background:rgba(255,255,255,0.02);display:flex;align-items:center;gap:6px;}
+.field-block-header.is-empty{color:rgba(224,148,64,0.9);background:rgba(224,148,64,0.06);}
+.empty-count-badge{font-size:10px;font-weight:700;background:rgba(224,148,64,0.2);color:var(--warning);border:1px solid rgba(224,148,64,0.4);padding:1px 6px;border-radius:10px;margin-left:4px;}
+.field-block-body{padding:10px 14px;}
+.field-value-view{font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-all;}
+
+/* IMAGE */
+.image-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.image-thumb{position:relative;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:var(--bg-4);border:1px solid var(--border);}
+.image-thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer;}
+.img-del{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.75);border:1px solid var(--danger);color:var(--danger);font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.image-add-btn{aspect-ratio:1;border-radius:var(--radius-sm);border:2px dashed var(--border-light);background:var(--bg-4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--text-2);font-size:11px;cursor:pointer;}
+.image-add-btn .plus{font-size:24px;line-height:1;}
+.image-view-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.image-view-thumb{aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--border);cursor:pointer;}
+.image-view-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+
+/* LIST FIELD */
+.list-field-wrap{display:flex;flex-direction:column;}
+.list-item-block{background:var(--bg-4);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px;}
+.list-item-header{display:flex;align-items:center;gap:8px;}
+
+/* LIGHTBOX */
+#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:200;align-items:center;justify-content:center;}
+#lightbox.active{display:flex;}
+#lightbox img{max-width:95vw;max-height:85dvh;object-fit:contain;border-radius:var(--radius);}
+#lightbox-close{position:absolute;top:calc(env(safe-area-inset-top,0px) + 16px);right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+
+/* FORMAT EDITOR */
+.section-item{background:var(--bg-2);border:1px solid var(--accent);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;}
+.section-item-header{background:rgba(124,106,245,0.1);padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(124,106,245,0.2);cursor:pointer;user-select:none;}
+.section-item-header.collapsed{border-bottom:none;}
+.section-item-arrow{font-size:10px;opacity:0.7;transition:transform 0.2s;display:inline-block;}
+.section-item-header.collapsed .section-item-arrow{transform:rotate(-90deg);}
+.section-item-body{padding:10px 12px 12px;}
+.section-item-body.collapsed{display:none;}
+.section-item-name{font-size:14px;font-weight:600;color:var(--accent);flex:1;}
+.child-field-item{background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+.child-field-body{flex:1;min-width:0;}
+.child-field-name{font-size:13px;font-weight:500;}
+.child-field-meta{font-size:11px;color:var(--text-2);margin-top:3px;display:flex;gap:5px;}
+.child-field-actions{display:flex;gap:3px;flex-shrink:0;}
+
+/* HISTORY */
+.history-item{padding:10px 0;border-bottom:1px solid var(--border);}
+.history-item:last-child{border-bottom:none;}
+.history-time{font-size:11px;color:var(--text-2);margin-bottom:4px;}
+.history-field{font-size:12px;color:var(--accent);font-weight:600;margin-bottom:2px;}
+.history-diff{font-size:13px;color:var(--text-1);line-height:1.6;}
+
+/* TAG LIST SCREEN */
+.tag-list-item{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
+.tag-list-item:active{border-color:var(--accent);}
+.tag-list-name{font-size:14px;font-weight:500;}
+.tag-list-count{font-size:12px;color:var(--text-2);}
+
+/* OPTION LIST */
+.option-item{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.option-item input{flex:1;}
+
+/* DRAG STATES */
+.memo-card.dragging{opacity:0.4;border:2px dashed var(--accent);}
+.memo-card.drag-over{border-color:var(--accent);background:var(--bg-3);}
+
+/* LOADING */
+.loading{display:flex;align-items:center;justify-content:center;height:100dvh;flex-direction:column;gap:12px;color:var(--text-2);font-size:14px;}
+.spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.section-header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.section-header-label{font-size:11px;font-weight:700;color:var(--text-2);letter-spacing:0.1em;text-transform:uppercase;}
+.flex-1{flex:1;}
+.text-muted{color:var(--text-2);font-size:13px;}
+.mt-8{margin-top:8px;}
+</style>
+</head>
+<body>
+
+<div id="loading" class="loading"><div class="spinner"></div><span>読み込み中...</span></div>
+<div id="app" style="display:none">
+
+<!-- GROUP LIST -->
+<div id="screen-groups" class="screen">
+  <div class="header">
+    <span class="header-logo">CHARA</span>
+    <span class="header-title">グループ一覧</span>
+    <button class="btn-icon" onclick="openBackupModal()">⬡</button>
+    <button class="btn-icon" onclick="showScreen('screen-formats')">⊞</button>
+  </div>
+  <div class="scroll-area" id="group-list"></div>
+  <div class="bottom-bar"><button class="btn btn-primary btn-full" onclick="openGroupModal()">＋ グループを作成</button></div>
+</div>
+
+<!-- MEMO LIST -->
+<div id="screen-memos" class="screen">
+  <div class="header">
+    <button class="btn-icon" onclick="showScreen('screen-groups')">←</button>
+    <span class="header-title" id="memo-list-title"></span>
+    <button class="btn-icon" onclick="showScreen('screen-tags')" title="タグ一覧">🏷</button>
+    <button class="btn-icon" onclick="exportXlsx()" title="CSV出力">📊</button>
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="mode-btn-view" onclick="setMode('view')">閲覧</button>
+      <button class="mode-btn" id="mode-btn-edit" onclick="setMode('edit')">編集</button>
+    </div>
+  </div>
+  <div class="scroll-area" id="memo-list"></div>
+  <div id="memo-add-bar" class="bottom-bar" style="display:none">
+    <button class="btn btn-primary btn-full" onclick="openNewMemoModal()">＋ メモを追加</button>
+  </div>
+  <div class="search-bar">
+    <div class="search-input-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" type="search" placeholder="タイトル / ID / タグで検索..." id="search-input" oninput="filterMemos()">
+    </div>
+  </div>
+</div>
+
+<!-- MEMO DETAIL -->
+<div id="screen-memo-detail" class="screen">
+  <div class="header">
+    <button class="btn-icon" onclick="showScreen('screen-memos')">←</button>
+    <span class="header-title">メモ</span>
+    <span class="autosave" id="autosave-indicator"><span class="autosave-dot"></span><span id="autosave-text">—</span></span>
+    <button class="btn-icon" id="undo-btn" onclick="undoMemo()" title="元に戻す" style="opacity:0.3;font-size:16px">↩</button>
+    <button class="btn-icon" id="redo-btn" onclick="redoMemo()" title="やり直す" style="opacity:0.3;font-size:16px">↪</button>
+    <button class="btn-icon" onclick="openHistoryModal()" title="変更履歴">📋</button>
+    <button class="btn-icon" onclick="openOutputModal()" title="出力">↗</button>
+  </div>
+  <div class="scroll-area" id="memo-detail-body"></div>
+</div>
+
+<!-- FORMATS -->
+<div id="screen-formats" class="screen">
+  <div class="header">
+    <button class="btn-icon" onclick="showScreen('screen-groups')">←</button>
+    <span class="header-title">フォーマット管理</span>
+  </div>
+  <div class="scroll-area" id="format-list"></div>
+  <div class="bottom-bar"><button class="btn btn-primary btn-full" onclick="openFormatCreateModal()">＋ フォーマットを作成</button></div>
+</div>
+
+<!-- TAG LIST -->
+<div id="screen-tags" class="screen">
+  <div class="header">
+    <button class="btn-icon" onclick="showScreen('screen-memos')">←</button>
+    <span class="header-title" id="tag-screen-title">タグ一覧</span>
+  </div>
+  <div class="scroll-area" id="tag-list-body"></div>
+</div>
+
+</div><!-- #app -->
+
+<!-- LIGHTBOX -->
+<div id="lightbox"><div id="lightbox-close" onclick="closeLightbox()">✕</div><img id="lightbox-img" src=""></div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modal-group">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span id="modal-group-title">グループを作成</span><button class="btn-icon" onclick="closeModal('modal-group')">✕</button></div>
+    <div class="modal-body"><div class="field-group"><label class="field-label">グループ名</label><input class="field-input" type="text" id="group-name-input" placeholder="例：第一部キャラクター"></div></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-group')">キャンセル</button>
+      <button class="btn btn-primary flex-1" onclick="saveGroup()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-new-memo">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span>メモを追加</span><button class="btn-icon" onclick="closeModal('modal-new-memo')">✕</button></div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">キャラ名</label><input class="field-input" type="text" id="new-memo-title" placeholder="キャラクター名"></div>
+      <div class="field-group"><label class="field-label">メモID <span style="color:var(--text-2);font-size:12px;text-transform:none">（省略で自動生成）</span></label><input class="field-input" type="text" id="new-memo-id" placeholder="例：chara_001"></div>
+      <div class="field-group"><label class="field-label">フォーマット</label><select class="field-select" id="new-memo-format"></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-new-memo')">キャンセル</button>
+      <button class="btn btn-primary flex-1" onclick="createMemo()">作成</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-format">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span id="modal-format-title">フォーマットを作成</span><button class="btn-icon" onclick="closeModal('modal-format')">✕</button></div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">フォーマット名</label><input class="field-input" type="text" id="format-name-input" placeholder="例：キャラクター設定"></div>
+      <div class="divider"></div>
+      <div class="divider"></div>
+      <div class="section-header-row">
+        <span class="section-header-label">出力セット</span>
+        <button class="btn btn-secondary btn-sm" onclick="addOutputSet()">＋ セットを追加</button>
+      </div>
+      <p style="color:var(--text-2);font-size:12px;margin-bottom:8px;line-height:1.5">用途ごとに出力する項目を設定できます。出力モーダルの「フォーマット」タブで選択できます。</p>
+      <div id="format-outputsets-list"></div>
+      <div class="divider"></div>
+      <div class="section-header-row">
+        <span class="section-header-label">大項目リスト</span>
+        <button class="btn btn-secondary btn-sm" onclick="addSection()">＋ 大項目を追加</button>
+      </div>
+      <div id="format-sections-list"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-format')">キャンセル</button>
+      <button class="btn btn-primary flex-1" onclick="saveFormat()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-section-name">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span id="modal-section-name-title">大項目を追加</span><button class="btn-icon" onclick="closeModal('modal-section-name')">✕</button></div>
+    <div class="modal-body"><div class="field-group"><label class="field-label">大項目名</label><input class="field-input" type="text" id="section-name-input" placeholder="例：基本情報、外見、性格"></div></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-section-name')">キャンセル</button>
+      <button class="btn btn-primary flex-1" onclick="saveSectionName()">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-field-edit">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span id="modal-field-title">項目を追加</span><button class="btn-icon" onclick="closeModal('modal-field-edit')">✕</button></div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">項目名</label><input class="field-input" type="text" id="field-name-input" placeholder="例：身長、髪色、性格"></div>
+      <div class="field-group"><label class="field-label">タイプ</label>
+        <select class="field-select" id="field-type-input" onchange="onFieldTypeChange()">
+          <option value="text">テキスト</option>
+          <option value="index">インデックス（選択肢）</option>
+          <option value="image">画像</option>
+          <option value="list">リスト（自由追加）</option>
+        </select>
+      </div>
+      <div id="field-text-opts"><div class="field-group"><label class="field-label">テンプレート本文 <span style="color:var(--text-2);font-size:12px;text-transform:none">（省略可）</span></label><textarea class="field-textarea" id="field-template-input" style="min-height:70px" placeholder="メモ作成時の初期テキスト..."></textarea></div></div>
+      <div id="field-index-opts" style="display:none">
+        <div class="field-group"><label class="field-label">選択肢</label><div id="field-options-list"></div><button class="btn btn-secondary btn-sm mt-8" onclick="addFieldOption()">＋ 選択肢を追加</button></div>
+        <div class="check-row"><input type="checkbox" id="field-multi-input"><label for="field-multi-input">複数選択を許可</label></div>
+      </div>
+      <div id="field-image-opts" style="display:none"><p style="color:var(--text-2);font-size:13px;line-height:1.6">カメラロールから複数の画像を追加できます（最大20枚）。</p></div>
+      <div id="field-list-opts" style="display:none"><p style="color:var(--text-2);font-size:13px;line-height:1.6">メモ編集時に小項目を自由に追加できます（最大100個）。<br>各小項目は名前＋テキストの形式です。</p></div>
+      <div class="divider"></div>
+      <div class="check-row"><input type="checkbox" id="field-export-input" checked><label for="field-export-input">出力対象にする</label></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-field-edit')">キャンセル</button>
+      <button class="btn btn-primary flex-1" onclick="saveFieldEdit()">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-output">
+  <div class="modal" style="max-height:95dvh">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span>出力</span><button class="btn-icon" onclick="closeModal('modal-output')">✕</button></div>
+    <div class="modal-body" style="padding-top:4px">
+      <!-- モード切替 -->
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        <button class="btn btn-sm flex-1" id="out-tab-format" onclick="switchOutputTab('format')" style="background:var(--accent);color:#fff;border:none">フォーマット</button>
+        <button class="btn btn-sm flex-1" id="out-tab-all" onclick="switchOutputTab('all')" style="background:var(--bg-3);color:var(--text-1);border:1px solid var(--border-light)">全体</button>
+        <button class="btn btn-sm flex-1" id="out-tab-custom" onclick="switchOutputTab('custom')" style="background:var(--bg-3);color:var(--text-1);border:1px solid var(--border-light)">カスタム</button>
+      </div>
+      <!-- フォーマット・全体出力テキスト -->
+      <div id="out-text-area">
+        <div id="output-text" class="output-text"></div>
+      </div>
+      <!-- カスタム選択UI -->
+      <div id="out-custom-area" style="display:none">
+        <div id="out-custom-list"></div>
+        <div id="output-text-custom" class="output-text" style="margin-top:12px;display:none"></div>
+      </div>
+    </div>
+    <div class="modal-footer" style="flex-direction:column;gap:8px">
+      <button class="btn btn-primary btn-full" id="out-copy-btn" onclick="copyOutput()">📋 全コピー</button>
+      <button class="btn btn-secondary btn-full" id="out-generate-btn" onclick="generateCustomOutput()" style="display:none">この内容で出力</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-backup">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span>バックアップ</span><button class="btn-icon" onclick="closeModal('modal-backup')">✕</button></div>
+    <div class="modal-body">
+      <div class="section-header-label" style="margin-bottom:8px">エクスポート</div>
+      <button class="btn btn-secondary btn-full" onclick="exportData()">📤 JSONをダウンロード</button>
+      <div class="divider"></div>
+      <div class="section-header-label" style="margin-bottom:8px">インポート</div>
+      <p style="color:var(--text-2);font-size:13px;margin-bottom:12px;line-height:1.6">※画像含む場合はファイルが大きくなります</p>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImportFile(event)">
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary flex-1" onclick="triggerImport('overwrite')">🔄 全上書き</button>
+        <button class="btn btn-secondary flex-1" onclick="triggerImport('merge')">➕ 追加</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-format-change">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span>フォーマット変更</span><button class="btn-icon" onclick="closeModal('modal-format-change')">✕</button></div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">フォーマットを選択</label><select class="field-select" id="format-change-select"></select></div>
+      <p style="color:var(--text-2);font-size:13px;margin-top:8px;line-height:1.6">同一項目IDのデータは保持されます。</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-format-change')">キャンセル</button>
+      <button class="btn btn-primary flex-1" onclick="applyFormatChange()">変更</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span id="confirm-title">確認</span></div>
+    <div class="modal-body"><p id="confirm-msg" style="font-size:14px;line-height:1.7;color:var(--text-1)"></p></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-confirm')">キャンセル</button>
+      <button class="btn btn-danger flex-1" id="confirm-ok-btn">削除</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal-overlay" id="modal-outputset-name">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span id="modal-outputset-name-title">出力セットを追加</span><button class="btn-icon" onclick="closeModal('modal-outputset-name')">✕</button></div>
+    <div class="modal-body"><div class="field-group"><label class="field-label">セット名</label><input class="field-input" type="text" id="outputset-name-input" placeholder="例：Web用、印刷用、共有用"></div></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-outputset-name')">キャンセル</button>
+      <button class="btn btn-primary flex-1" onclick="saveOutputSetName()">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRIMMER MODAL -->
+<div class="modal-overlay" id="modal-trimmer">
+  <div class="modal" style="max-height:95dvh">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span>アイコンをトリミング</span><button class="btn-icon" onclick="closeModal('modal-trimmer')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;align-items:center;gap:10px">
+      <p style="color:var(--text-2);font-size:12px">ドラッグで移動・ピンチまたはボタンで拡大縮小</p>
+      <canvas id="trimmer-canvas" style="max-width:100%;border-radius:var(--radius);touch-action:none;cursor:grab"
+        onmousedown="trimmerPointerDown(event)" onmousemove="trimmerPointerMove(event)" onmouseup="trimmerPointerUp(event)"
+        ontouchstart="trimmerPointerDown(event)" ontouchmove="trimmerPointerMove(event)" ontouchend="trimmerPointerUp(event)">
+      </canvas>
+      <div style="display:flex;gap:12px">
+        <button class="btn btn-secondary btn-sm" style="width:48px;font-size:20px" onclick="trimmerZoomOut()">－</button>
+        <button class="btn btn-secondary btn-sm" style="width:48px;font-size:20px" onclick="trimmerZoomIn()">＋</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-trimmer')">キャンセル</button>
+      <button class="btn btn-primary flex-1" onclick="applyTrimmer()">これで設定</button>
+    </div>
+  </div>
+</div>
+
+<!-- COPY TO MODAL -->
+<div class="modal-overlay" id="modal-copy-to">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span>コピー先のキャラを選択</span><button class="btn-icon" onclick="closeModal('modal-copy-to')">✕</button></div>
+    <div class="modal-body">
+      <p style="color:var(--text-2);font-size:13px;margin-bottom:12px;line-height:1.6">選んだキャラの全データを上書きします。この操作は取り消せません。</p>
+      <div id="copy-to-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LINK SELECT MODAL -->
+<div class="modal-overlay" id="modal-link-select">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span>関連キャラを追加</span><button class="btn-icon" onclick="closeModal('modal-link-select')">✕</button></div>
+    <div class="modal-body"><div id="link-select-list"></div></div>
+  </div>
+</div>
+
+<!-- HISTORY MODAL -->
+<div class="modal-overlay" id="modal-history">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span>変更履歴</span><button class="btn-icon" onclick="closeModal('modal-history')">✕</button></div>
+    <div class="modal-body"><div id="history-list"></div></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<input type="file" id="image-file-input" accept="image/*" multiple style="display:none" onchange="handleImageFiles(event)">
+<input type="file" id="cover-file-input" accept="image/*" style="display:none" onchange="handleCoverFile(event)">
+
+<script>
+// ===== DB =====
+const DB_NAME='CharaMemoDB2';
+let db;
+function openDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded=e=>{
+      const d=e.target.result;
+      ['groups','formats','memos'].forEach(s=>{if(!d.objectStoreNames.contains(s))d.createObjectStore(s,{keyPath:'id'});});
+    };
+    req.onsuccess=e=>{db=e.target.result;res(db);};
+    req.onerror=()=>rej(req.error);
+  });
+}
+const txs=(s,m='readonly')=>db.transaction(s,m).objectStore(s);
+const dbGetAll=s=>new Promise((r,j)=>{const q=txs(s).getAll();q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
+const dbGet=(s,k)=>new Promise((r,j)=>{const q=txs(s).get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
+const dbPut=(s,v)=>new Promise((r,j)=>{const q=txs(s,'readwrite').put(v);q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
+const dbDelete=(s,k)=>new Promise((r,j)=>{const q=txs(s,'readwrite').delete(k);q.onsuccess=()=>r();q.onerror=()=>j(q.error);});
+
+// ===== STATE =====
+let currentGroupId=null,currentMemoId=null,currentMode='view';
+let pendingOutputSets=[]; // [{setId, name, fieldKeys:[]}]
+let editingOutputSetIdx=null;
+let currentMemo=null,currentFormat=null,allMemos=[];
+let editingFormatId=null,pendingSections=[];
+let editingSectionIdx=null,editingFieldIdx=null;
+let autosaveTimer=null,importMode=null,pendingImageKey=null;
+let lightboxImages=[],lightboxIdx=0;
+let dragSrcIdx=null;
+// Undo/Redo
+let undoStack=[]; // [{fieldValues, title}]
+let redoStack=[];
+// コピペ後に一度も編集していない項目を追跡
+let copiedUneditedKeys=new Set();
+// 折りたたみ状態を記憶（key: sid → true=collapsed）
+const memoCollapseState={};
+const formatCollapseState={};
+
+// ===== UTILS =====
+const uuid=()=>'id_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const now=()=>new Date().toISOString();
+const esc=s=>s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id==='screen-formats')loadFormats();
+  if(id==='screen-groups')loadGroups();
+  if(id==='screen-tags')loadTagList();
+}
+function openModal(id){document.getElementById(id).classList.add('active');}
+function closeModal(id){document.getElementById(id).classList.remove('active');}
+function confirmDialog(title,msg,okLabel,onOk){
+  document.getElementById('confirm-title').textContent=title;
+  document.getElementById('confirm-msg').textContent=msg;
+  const btn=document.getElementById('confirm-ok-btn');btn.textContent=okLabel;
+  btn.onclick=()=>{closeModal('modal-confirm');onOk();};
+  openModal('modal-confirm');
+}
+
+// ===== LIVE EMPTY UPDATE =====
+function updateEmptyUI(key){
+  if(!currentMemo||!currentFormat||currentMode!=='edit')return;
+  // keyからsectionId特定
+  const underIdx=key.indexOf('_');
+  const secId=parseInt(key.slice(0,underIdx));
+  const sec=currentFormat.sections.find(s=>s.sectionId===secId);
+  if(!sec)return;
+  const sid=`sec_${secId}`;
+  // フィールドヘッダー更新
+  const fhdr=document.getElementById(`fhdr_${key}`);
+  const field=sec.fields.find(f=>`${sec.sectionId}_${f.fieldId}`===key);
+  if(fhdr&&field){
+    const isEmpty=isEmptyVal(field,currentMemo.fieldValues[key],key);
+    fhdr.classList.toggle('is-empty',isEmpty);
+  }
+  // セクションバッジ更新
+  let emptyCount=0;
+  for(const f of sec.fields){
+    const k=`${sec.sectionId}_${f.fieldId}`;
+    if(isEmptyVal(f,currentMemo.fieldValues[k],k))emptyCount++;
+  }
+  const badge=document.getElementById(`badge_${sid}`);
+  if(badge){
+    badge.style.display=emptyCount>0?'':'none';
+    badge.textContent=`未入力 ${emptyCount}`;
+  }
+}
+
+// ===== UNDO / REDO =====
+function pushUndoStack(){
+  if(!currentMemo)return;
+  undoStack.push({
+    fieldValues:JSON.parse(JSON.stringify(currentMemo.fieldValues||{})),
+    title:currentMemo.title||''
+  });
+  if(undoStack.length>50)undoStack.shift();
+  redoStack=[];
+  updateUndoRedoUI();
+}
+function undoMemo(){
+  if(!undoStack.length){showToast('これ以上戻れません');return;}
+  redoStack.push({
+    fieldValues:JSON.parse(JSON.stringify(currentMemo.fieldValues||{})),
+    title:currentMemo.title||''
+  });
+  const state=undoStack.pop();
+  currentMemo.fieldValues=JSON.parse(JSON.stringify(state.fieldValues));
+  currentMemo.title=state.title;
+  currentMemo.updatedAt=now();
+  dbPut('memos',currentMemo);
+  updateUndoRedoUI();
+  renderMemoDetail();
+  showToast('元に戻しました');
+}
+function redoMemo(){
+  if(!redoStack.length){showToast('これ以上やり直せません');return;}
+  undoStack.push({
+    fieldValues:JSON.parse(JSON.stringify(currentMemo.fieldValues||{})),
+    title:currentMemo.title||''
+  });
+  const state=redoStack.pop();
+  currentMemo.fieldValues=JSON.parse(JSON.stringify(state.fieldValues));
+  currentMemo.title=state.title;
+  currentMemo.updatedAt=now();
+  dbPut('memos',currentMemo);
+  updateUndoRedoUI();
+  renderMemoDetail();
+  showToast('やり直しました');
+}
+function updateUndoRedoUI(){
+  const undoBtn=document.getElementById('undo-btn');
+  const redoBtn=document.getElementById('redo-btn');
+  if(undoBtn)undoBtn.style.opacity=undoStack.length?'1':'0.3';
+  if(redoBtn)redoBtn.style.opacity=redoStack.length?'1':'0.3';
+}
+function isEmptyVal(field,val,key,memo){
+  // コピペ後未編集なら常に未入力扱い
+  // memo引数あり→DBのcopiedUneditedKeysを参照（一覧用）
+  // memo引数なし→currentMemoのcopiedUneditedKeys Setを参照（詳細画面用）
+  if(key){
+    if(memo){
+      if((memo.copiedUneditedKeys||[]).includes(key))return true;
+    } else {
+      if(copiedUneditedKeys.has(key))return true;
+    }
+  }
+  if(field.type==='text'){
+    const str=typeof val==='string'?val:'';
+    if(!str||str.trim()==='')return true;
+    if(field.template&&str.trim()===field.template.trim())return true;
+    return false;
+  }
+  if(field.type==='index')return !Array.isArray(val)||val.length===0;
+  if(field.type==='image')return !Array.isArray(val)||val.length===0;
+  if(field.type==='list'){
+    if(!Array.isArray(val)||val.length===0)return true;
+    // 中身がある項目が1つもなければ未入力扱い
+    return !val.some(item=>(item.name&&item.name.trim())||(item.text&&item.text.trim()));
+  }
+  return false;
+}
+
+// ===== COLLAPSIBLE =====
+function toggleSection(sid){
+  const lbl=document.getElementById('lbl_'+sid);
+  const fld=document.getElementById('fld_'+sid);
+  if(!lbl||!fld)return;
+  const isNowCollapsed=!lbl.classList.contains('collapsed');
+  lbl.classList.toggle('collapsed',isNowCollapsed);
+  fld.classList.toggle('collapsed',isNowCollapsed);
+  memoCollapseState[sid]=isNowCollapsed;
+}
+function toggleFormatSection(si){
+  const hdr=document.getElementById(`fmthdr_${si}`);
+  const bdy=document.getElementById(`fmtbdy_${si}`);
+  if(!hdr||!bdy)return;
+  const isNowCollapsed=!hdr.classList.contains('collapsed');
+  hdr.classList.toggle('collapsed',isNowCollapsed);
+  bdy.classList.toggle('collapsed',isNowCollapsed);
+  formatCollapseState[si]=isNowCollapsed;
+}
+function applyMemoCollapseState(){
+  for(const sid of Object.keys(memoCollapseState)){
+    const lbl=document.getElementById('lbl_'+sid);
+    const fld=document.getElementById('fld_'+sid);
+    if(lbl)lbl.classList.toggle('collapsed',!!memoCollapseState[sid]);
+    if(fld)fld.classList.toggle('collapsed',!!memoCollapseState[sid]);
+  }
+  // 初回（stateに記録なし）は全部閉じる
+  document.querySelectorAll('.section-label').forEach(lbl=>{
+    const sid=lbl.id.replace('lbl_','');
+    if(!(sid in memoCollapseState)){
+      lbl.classList.add('collapsed');
+      const fld=document.getElementById('fld_'+sid);
+      if(fld)fld.classList.add('collapsed');
+      memoCollapseState[sid]=true;
+    }
+  });
+}
+function applyFormatCollapseState(){
+  for(const si of Object.keys(formatCollapseState)){
+    if(!formatCollapseState[si])continue;
+    const hdr=document.getElementById(`fmthdr_${si}`);
+    const bdy=document.getElementById(`fmtbdy_${si}`);
+    if(hdr)hdr.classList.add('collapsed');
+    if(bdy)bdy.classList.add('collapsed');
+  }
+}
+
+// ===== GROUPS =====
+async function loadGroups(){
+  const[groups,memos]=await Promise.all([dbGetAll('groups'),dbGetAll('memos')]);
+  const el=document.getElementById('group-list');
+  if(!groups.length){el.innerHTML=`<div class="empty"><div class="empty-icon">📁</div><div class="empty-text">グループがありません<br>下のボタンから作成してください</div></div>`;return;}
+  groups.sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+  el.innerHTML=groups.map(g=>{
+    const cnt=memos.filter(m=>m.groupId===g.id).length;
+    return `<div class="card" onclick="openGroup('${g.id}')">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div><div class="card-title">${esc(g.name)}</div><div class="card-sub">${cnt}/100件</div></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-icon" style="width:30px;height:30px;font-size:13px" onclick="event.stopPropagation();openGroupModal('${g.id}')">✏</button>
+          <button class="btn-icon" style="width:30px;height:30px;font-size:13px;color:var(--danger)" onclick="event.stopPropagation();deleteGroup('${g.id}')">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function openGroupModal(id=null){
+  const inp=document.getElementById('group-name-input');
+  document.getElementById('modal-group-title').textContent=id?'グループを編集':'グループを作成';
+  inp.value='';delete inp.dataset.editId;
+  if(id){dbGet('groups',id).then(g=>{inp.value=g.name;});inp.dataset.editId=id;}
+  openModal('modal-group');setTimeout(()=>inp.focus(),300);
+}
+async function saveGroup(){
+  const inp=document.getElementById('group-name-input');const name=inp.value.trim();
+  if(!name){showToast('グループ名を入力してください');return;}
+  const editId=inp.dataset.editId;
+  if(editId){const g=await dbGet('groups',editId);await dbPut('groups',{...g,name,updatedAt:now()});}
+  else await dbPut('groups',{id:uuid(),name,createdAt:now(),updatedAt:now()});
+  closeModal('modal-group');loadGroups();
+}
+async function deleteGroup(id){
+  const g=await dbGet('groups',id);
+  confirmDialog('グループを削除',`「${g.name}」とその中のメモをすべて削除します。`,'削除',async()=>{
+    const memos=await dbGetAll('memos');
+    for(const m of memos.filter(m=>m.groupId===id))await dbDelete('memos',m.id);
+    await dbDelete('groups',id);loadGroups();
+  });
+}
+
+// ===== MEMO LIST =====
+async function openGroup(groupId){
+  currentGroupId=groupId;currentMode='view';
+  const g=await dbGet('groups',groupId);
+  document.getElementById('memo-list-title').textContent=g.name;
+  document.getElementById('tag-screen-title').textContent=g.name+' のタグ';
+  updateModeUI();showScreen('screen-memos');await loadMemos();
+}
+let allFormatsMap={}; // formatId -> format
+
+async function loadMemos(){
+  const [memos,formats]=await Promise.all([dbGetAll('memos'),dbGetAll('formats')]);
+  allFormatsMap={};
+  for(const f of formats)allFormatsMap[f.id]=f;
+  allMemos=memos.filter(m=>m.groupId===currentGroupId).sort((a,b)=>(a.sortOrder??9999)-(b.sortOrder??9999)||(a.createdAt.localeCompare(b.createdAt)));
+  renderMemoList(allMemos);
+}
+function renderMemoList(memos){
+  const el=document.getElementById('memo-list');
+  if(!memos.length){el.innerHTML=`<div class="empty"><div class="empty-icon">📝</div><div class="empty-text">メモがありません${currentMode==='edit'?'<br>下のボタンから追加できます':''}</div></div>`;return;}
+  el.innerHTML=memos.map((m,i)=>{
+    const tags=(m.tags||[]).slice(0,3).map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('');
+    const more=(m.tags||[]).length>3?`<span class="tag-chip">+${m.tags.length-3}</span>`:'';
+    const coverHtml=m.coverImage
+      ?`<div class="memo-card-cover"><img src="${m.coverImage}" alt=""></div>`
+      :`<div class="memo-card-cover"><span class="memo-card-cover-placeholder">👤</span></div>`;
+    const lockIcon=m.locked?'🔒':'';
+    const editActions=currentMode==='edit'?`
+      <div class="memo-card-actions">
+        <div class="drag-handle" draggable="true" 
+          ondragstart="onDragStart(event,${i})" 
+          ondragend="onDragEnd(event)">⠿</div>
+        <button class="btn-icon" style="width:28px;height:28px;font-size:12px" onclick="event.stopPropagation();toggleMemoLock('${m.id}')" title="${m.locked?'ロック解除':'ロック'}">${m.locked?'🔒':'🔓'}</button>
+        <button class="btn-icon" style="width:28px;height:28px;font-size:12px" onclick="event.stopPropagation();duplicateMemo('${m.id}')" title="複製">⧉</button>
+        <button class="btn-icon" style="width:28px;height:28px;font-size:12px;color:var(--danger)" onclick="event.stopPropagation();deleteMemo('${m.id}')">✕</button>
+      </div>`:'';
+    const dragAttrs=currentMode==='edit'
+      ?`ondragover="onDragOver(event,${i})" ondrop="onDrop(event,${i})" ondragleave="onDragLeave(event)"`
+      :'';
+    // 編集モードのみ未設定項目数を計算
+    let emptyBadgeHtml='';
+    if(currentMode==='edit'){
+      const fmt=allFormatsMap[m.formatId];
+      if(fmt){
+        let totalEmpty=0;
+        for(const sec of fmt.sections){
+          for(const f of sec.fields){
+            const k=`${sec.sectionId}_${f.fieldId}`;
+            if(isEmptyVal(f,(m.fieldValues||{})[k],k,m))totalEmpty++;
+          }
+        }
+        if(totalEmpty>0)emptyBadgeHtml=`<span style="font-size:10px;background:rgba(224,148,64,0.2);color:var(--warning);border:1px solid rgba(224,148,64,0.4);padding:1px 7px;border-radius:10px;margin-left:6px">未設定 ${totalEmpty}</span>`;
+      }
+    }
+    return `<div class="memo-card" id="memo-card-${i}" data-idx="${i}"
+      onclick="openMemo('${m.id}')"
+      ${dragAttrs}>
+      ${coverHtml}
+      <div class="memo-card-body">
+        <div class="card-title" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">${esc(m.title||'（名称未設定）')}${emptyBadgeHtml}</div>
+        <div class="card-sub">${esc(m.id)}</div>
+        ${tags||more?`<div class="card-tags">${tags}${more}</div>`:''}
+      </div>
+      ${editActions}
+    </div>`;
+  }).join('');
+}
+function filterMemos(){
+  const q=document.getElementById('search-input').value.trim().toLowerCase();
+  if(!q){renderMemoList(allMemos);return;}
+  renderMemoList(allMemos.filter(m=>(m.title||'').toLowerCase().includes(q)||m.id.toLowerCase().includes(q)||(m.tags||[]).some(t=>t.toLowerCase().includes(q))));
+}
+function setMode(mode){currentMode=mode;updateModeUI();renderMemoList(allMemos);}
+function updateModeUI(){
+  document.getElementById('mode-btn-view').classList.toggle('active',currentMode==='view');
+  document.getElementById('mode-btn-edit').classList.toggle('active',currentMode==='edit');
+  document.getElementById('memo-add-bar').style.display=currentMode==='edit'?'flex':'none';
+}
+
+// ===== DRAG SORT =====
+function onDragStart(e,idx){
+  if(currentMode!=='edit')return;
+  dragSrcIdx=idx;
+  setTimeout(()=>{const el=document.getElementById(`memo-card-${idx}`);if(el)el.classList.add('dragging');},0);
+  e.dataTransfer.effectAllowed='move';
+}
+function onDragEnd(e){
+  document.querySelectorAll('.memo-card').forEach(c=>{c.classList.remove('dragging','drag-over');});
+  dragSrcIdx=null;
+}
+function onDragOver(e,idx){
+  e.preventDefault();e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.memo-card').forEach(c=>c.classList.remove('drag-over'));
+  const el=document.getElementById(`memo-card-${idx}`);if(el)el.classList.add('drag-over');
+}
+function onDragLeave(e){e.currentTarget.classList.remove('drag-over');}
+async function onDrop(e,toIdx){
+  e.preventDefault();
+  if(dragSrcIdx===null||dragSrcIdx===toIdx)return;
+  const moved=allMemos.splice(dragSrcIdx,1)[0];
+  allMemos.splice(toIdx,0,moved);
+  allMemos.forEach((m,i)=>{m.sortOrder=i;});
+  await Promise.all(allMemos.map(m=>dbPut('memos',m)));
+  renderMemoList(allMemos);
+}
+
+// ===== DUPLICATE MEMO =====
+async function duplicateMemo(memoId){
+  const src=await dbGet('memos',memoId);
+  const all=await dbGetAll('memos');
+  if(all.filter(m=>m.groupId===currentGroupId).length>=100){showToast('グループが満杯です（最大100）');return;}
+  const nums=all.map(m=>{const match=m.id.match(/^chara_(\d+)$/);return match?parseInt(match[1]):0;});
+  const newId='chara_'+String(Math.max(0,...nums)+1).padStart(3,'0');
+  const copy={
+    ...src,
+    id:newId,
+    title:(src.title||'')+'_コピー',
+    fieldValues:JSON.parse(JSON.stringify(src.fieldValues||{})),
+    tags:[...(src.tags||[])],
+    linkedMemos:[...(src.linkedMemos||[])],
+    history:[],
+    sortOrder:(src.sortOrder??0)+0.5,
+    createdAt:now(),updatedAt:now()
+  };
+  await dbPut('memos',copy);
+  await loadMemos();
+  showToast('複製しました');
+}
+
+// ===== NEW MEMO =====
+async function openNewMemoModal(){
+  const memos=await dbGetAll('memos');
+  if(memos.filter(m=>m.groupId===currentGroupId).length>=100){showToast('このグループは満杯です（最大100）');return;}
+  const formats=await dbGetAll('formats');
+  if(!formats.length){showToast('先にフォーマットを作成してください');showScreen('screen-formats');return;}
+  document.getElementById('new-memo-format').innerHTML=formats.map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join('');
+  document.getElementById('new-memo-title').value='';document.getElementById('new-memo-id').value='';
+  openModal('modal-new-memo');setTimeout(()=>document.getElementById('new-memo-title').focus(),300);
+}
+async function createMemo(){
+  const title=document.getElementById('new-memo-title').value.trim();
+  const rawId=document.getElementById('new-memo-id').value.trim();
+  const formatId=document.getElementById('new-memo-format').value;
+  if(!title){showToast('キャラ名を入力してください');return;}
+  let memoId=rawId;
+  if(memoId){
+    if(!/^[a-zA-Z0-9_-]+$/.test(memoId)){showToast('IDは英数字・_・-のみ');return;}
+    if(await dbGet('memos',memoId)){showToast('そのIDは既に使われています');return;}
+  }else{
+    const all=await dbGetAll('memos');
+    const nums=all.map(m=>{const match=m.id.match(/^chara_(\d+)$/);return match?parseInt(match[1]):0;});
+    memoId='chara_'+String(Math.max(0,...nums)+1).padStart(3,'0');
+  }
+  const format=await dbGet('formats',formatId);
+  const fieldValues={};
+  for(const sec of format.sections)for(const f of sec.fields){
+    const key=`${sec.sectionId}_${f.fieldId}`;
+    fieldValues[key]=f.type==='text'?(f.template||''):[];
+  }
+  const allM=await dbGetAll('memos');
+  const groupMemos=allM.filter(m=>m.groupId===currentGroupId);
+  const maxOrder=groupMemos.reduce((mx,m)=>Math.max(mx,m.sortOrder??0),0);
+  await dbPut('memos',{id:memoId,title,groupId:currentGroupId,formatId,tags:[],linkedMemos:[],coverImage:null,fieldValues,history:[],sortOrder:maxOrder+1,createdAt:now(),updatedAt:now()});
+  closeModal('modal-new-memo');await loadMemos();openMemo(memoId);
+}
+
+// ===== MEMO DETAIL =====
+async function openMemo(memoId){
+  try{
+    const prevMemoId=currentMemoId;
+    currentMemo=await dbGet('memos',memoId);
+    if(!currentMemo){showToast('メモが見つかりません');return;}
+    currentFormat=await dbGet('formats',currentMemo.formatId);
+    if(!currentMemo.linkedMemos)currentMemo.linkedMemos=[];
+    if(!currentMemo.history)currentMemo.history=[];
+    if(!currentMemo.coverImage)currentMemo.coverImage=null;
+    // メモを開くたびに常にリセット
+    Object.keys(memoCollapseState).forEach(k=>delete memoCollapseState[k]);
+    undoStack=[];redoStack=[];
+    copiedUneditedKeys=new Set(currentMemo.copiedUneditedKeys||[]);
+    currentMemoId=memoId;
+    // ロック中は強制的に閲覧モード
+    if(currentMemo.locked && currentMode==='edit'){
+      // 閲覧モードで開くが一覧に戻ったときはeditモードを維持
+      const savedMode=currentMode;
+      currentMode='view';
+      renderMemoDetail();
+      currentMode=savedMode;
+    } else {
+      renderMemoDetail();
+    }
+    showScreen('screen-memo-detail');
+    snapshotFields();
+  }catch(e){
+    showToast('メモを開けませんでした: '+e.message);
+  }
+}
+
+function renderMemoDetail(){
+  const el=document.getElementById('memo-detail-body');
+  try{
+  const m=currentMemo,fmt=currentFormat,isEdit=currentMode==='edit';
+  let html='';
+
+  // Cover image
+  const isLocked=m.locked&&!isEdit;
+  if(isEdit&&!m.locked){
+    if(m.coverImage){
+      html+=`<div class="memo-cover-area" style="position:relative">
+        <img class="memo-cover-img" src="${m.coverImage}">
+        <button class="btn-icon" style="position:absolute;top:8px;right:48px;background:rgba(0,0,0,0.6);color:#fff" onclick="openTrimmer('${m.coverImage}')" title="トリミング">✂</button>
+        <button class="btn-icon" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:var(--danger);border-color:var(--danger)" onclick="removeCoverImage()">✕</button>
+      </div>`;
+    }else{
+      html+=`<div class="memo-cover-area">
+        <div class="memo-cover-placeholder" onclick="triggerCoverSelect()"><span>👤</span><span>カバー画像を追加</span></div>
+      </div>`;
+    }
+  }else if(m.locked){
+    html+=`<div style="background:rgba(224,148,64,0.1);border:1px solid rgba(224,148,64,0.3);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;color:var(--warning);font-size:13px">
+      <span>🔒</span><span>このメモはロックされています</span>
+    </div>`;
+    if(m.coverImage){html+=`<div class="memo-cover-area"><img class="memo-cover-img" src="${m.coverImage}"></div>`;}
+  }else if(m.coverImage){
+    html+=`<div class="memo-cover-area"><img class="memo-cover-img" src="${m.coverImage}"></div>`;
+  }
+
+  // Title
+  if(isEdit){
+    html+=`<input class="memo-title-input" type="text" id="memo-title-field" value="${esc(m.title||'')}" placeholder="キャラ名" oninput="onMemoChange()">`;
+  }else{
+    html+=`<div class="memo-title-view">${esc(m.title||'（名称未設定）')}</div>`;
+  }
+
+  // Badges
+  html+=`<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    <span class="badge badge-text">ID: ${esc(m.id)}</span>
+    <span class="badge badge-section">${esc(fmt?fmt.name:'?')}</span>
+    ${isEdit?`<span class="badge" style="background:var(--bg-4);color:var(--text-2);border:1px solid var(--border);cursor:pointer" onclick="openFormatChangeModal()">フォーマット変更</span>`:''}
+  </div>`;
+
+  // Sections
+  const sections=fmt?[...fmt.sections].sort((a,b)=>a.order-b.order):[];
+  for(const sec of sections){
+    const sid=`sec_${sec.sectionId}`;
+    // 編集モードのみ未入力カウント
+    let emptyCount=0;
+    if(isEdit){
+      for(const field of sec.fields){
+        const key=`${sec.sectionId}_${field.fieldId}`;
+        const val=m.fieldValues[key];
+        if(isEmptyVal(field,val,key))emptyCount++;
+      }
+    }
+    const emptyBadge=isEdit&&emptyCount>0?`<span class="empty-count-badge">未入力 ${emptyCount}</span>`:'';
+    html+=`<div class="section-block"><div class="section-label" id="lbl_${sid}" onclick="toggleSection('${sid}')"><span class="section-label-arrow">▸</span>${esc(sec.name)}<span class="empty-count-badge" id="badge_${sid}" style="${isEdit&&emptyCount>0?'':'display:none'}">未入力 ${emptyCount}</span></div><div class="section-fields" id="fld_${sid}">`;
+    for(const field of [...sec.fields].sort((a,b)=>a.order-b.order)){
+      const key=`${sec.sectionId}_${field.fieldId}`;
+      const val=m.fieldValues[key];
+      const expBadge=field.exportable&&field.type!=='image'?`<span class="badge badge-export" style="font-size:9px;padding:1px 5px">出力</span>`:'';
+      const isEmpty=isEdit&&isEmptyVal(field,val,key);
+      const emptyClass=isEmpty?' is-empty':'';
+      html+=`<div class="field-block"><div class="field-block-header${emptyClass}" id="fhdr_${key}">${esc(field.name)} ${expBadge}</div><div class="field-block-body">${renderFieldBody(field,val,key,isEdit)}</div></div>`;
+    }
+    html+=`</div></div>`;
+  }
+
+  // Linked memos
+  const links=m.linkedMemos||[];
+  html+=`<div class="section-block"><div class="section-label" id="lbl_links" onclick="toggleSection('links')" style="color:var(--warning)"><span class="section-label-arrow">▸</span>関連キャラ</div><div class="section-fields" id="fld_links"><div class="field-block"><div class="field-block-body">`;
+  if(isEdit){
+    const chips=links.map(lid=>{
+      const lm=allMemos.find(x=>x.id===lid);
+      const name=lm?lm.title||lid:lid;
+      return `<span class="link-chip"><span class="link-chip-name" onclick="openMemo('${lid}')">${esc(name)}</span><span class="link-chip-remove" onclick="removeMemoLink('${lid}')">×</span></span>`;
+    }).join('');
+    html+=`<div class="tag-input-area" style="gap:6px">${chips}<button class="btn btn-secondary btn-sm" onclick="openLinkSelectModal()" style="border-radius:14px;padding:3px 10px;font-size:12px">＋ 追加</button></div>`;
+  }else{
+    if(links.length){
+      const chips=links.map(lid=>{
+        const lm=allMemos.find(x=>x.id===lid);
+        const name=lm?lm.title||lid:lid;
+        return `<span class="link-chip-view" onclick="openMemo('${lid}')">→ ${esc(name)}</span>`;
+      }).join('');
+      html+=`<div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>`;
+    }else{
+      html+=`<span style="color:var(--text-2);font-size:13px">なし</span>`;
+    }
+  }
+  html+=`</div></div></div></div>`;
+
+  // Tags
+  html+=`<div class="section-block"><div class="section-label" id="lbl_tags" onclick="toggleSection('tags')" style="color:var(--text-2)"><span class="section-label-arrow">▸</span>タグ <span id="tag-count" style="font-weight:400">${(m.tags||[]).length}/50</span></div><div class="section-fields" id="fld_tags"><div class="field-block"><div class="field-block-body">`;
+  if(isEdit){
+    const tagItems=(m.tags||[]).map(t=>`<span class="tag-item">${esc(t)}<span class="tag-remove" onclick="removeTag('${esc(t)}')">×</span></span>`).join('');
+    html+=`<div class="tag-input-area" id="tag-area">${tagItems}<input type="text" id="tag-input" placeholder="タグを入力してEnter" maxlength="30" onkeydown="onTagKeydown(event)"></div>`;
+  }else{
+    html+=(m.tags||[]).length?`<div class="card-tags">${m.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('')}</div>`:`<span style="color:var(--text-2);font-size:13px">タグなし</span>`;
+  }
+  html+=`</div></div></div></div>`;
+
+  if(isEdit)html+=`<div style="margin-top:20px;padding-bottom:24px;display:flex;flex-direction:column;gap:10px">
+    <button class="btn btn-secondary btn-full" onclick="openCopyToModal()">⧉ 他のキャラにコピー</button>
+    <button class="btn btn-danger btn-full" onclick="deleteMemo('${m.id}')">このメモを削除</button>
+  </div>`;
+  el.innerHTML=html;updateAutosave('—');applyMemoCollapseState();
+  }catch(e){
+    el.innerHTML=`<div style="padding:20px;color:var(--danger)">
+      <div style="font-size:16px;margin-bottom:8px">⚠ 表示エラー</div>
+      <div style="font-size:13px;color:var(--text-2)">${esc(e.message)}</div>
+      <div style="font-size:12px;color:var(--text-2);margin-top:8px">フォーマットの項目タイプを変更した場合、一度フォーマットを保存し直すと直る場合があります。</div>
+    </div>`;
+  }
+}
+
+function renderFieldBody(field,val,key,isEdit){
+  if(field.type==='text'){
+    // 型変更でvalが配列になっている場合を安全に処理
+    let text='';
+    if(typeof val==='string')text=val;
+    else if(Array.isArray(val))text='';
+    else text=field.template||'';
+    if(isEdit)return`<textarea class="field-textarea" style="min-height:80px;font-size:14px" oninput="onFieldChange('${key}',this.value)">${esc(text)}</textarea>`;
+    return text?`<div class="field-value-view">${esc(text)}</div>`:`<span style="color:var(--text-2);font-size:13px">未入力</span>`;
+  }
+  if(field.type==='index'){
+    const sel=Array.isArray(val)?val:[];const opts=field.indexOptions||[];
+    if(isEdit)return`<div class="index-options">${opts.map(o=>`<div class="index-chip ${sel.includes(o)?'selected':''}" onclick="toggleIndex('${key}','${esc(o)}',${field.multiSelect})">${esc(o)}</div>`).join('')}</div>`;
+    return sel.length?`<div class="index-options">${sel.map(o=>`<div class="index-chip selected readonly">${esc(o)}</div>`).join('')}</div>`:`<span style="color:var(--text-2);font-size:13px">未選択</span>`;
+  }
+  if(field.type==='image'){
+    const imgs=Array.isArray(val)?val:[];
+    if(isEdit){
+      const thumbs=imgs.map((img,i)=>`<div class="image-thumb">
+        <img src="${img}" onclick="openLightbox('${key}',${i})">
+        <div class="img-del" onclick="removeImage('${key}',${i})">✕</div>
+      </div>`).join('');
+      const add=imgs.length<20?`<div class="image-add-btn" onclick="triggerImageAdd('${key}')"><span class="plus">＋</span><span>画像を追加</span></div>`:'';
+      return`<div class="image-grid">${thumbs}${add}</div>`;
+    }
+    if(!imgs.length)return`<span style="color:var(--text-2);font-size:13px">画像なし</span>`;
+    return`<div class="image-view-grid">${imgs.map((img,i)=>`<div class="image-view-thumb">
+      <img src="${img}" onclick="openLightbox('${key}',${i})">
+    </div>`).join('')}</div>`;
+  }
+  if(field.type==='list'){
+    const items=Array.isArray(val)?val:[];
+    if(isEdit){
+      const rows=items.map((item,i)=>`
+        <div class="list-item-block">
+          <div class="list-item-header">
+            <input class="field-input" style="font-size:13px;padding:7px 10px" type="text" value="${esc(item.name||'')}" placeholder="名前（例：鈴木一郎）" oninput="onListItemChange('${key}',${i},'name',this.value)">
+            <button class="btn-icon" style="width:30px;height:30px;font-size:13px;color:var(--danger);flex-shrink:0" onclick="removeListItem('${key}',${i})">✕</button>
+          </div>
+          <textarea class="field-textarea" style="min-height:60px;font-size:14px;margin-top:6px" placeholder="内容..." oninput="onListItemChange('${key}',${i},'text',this.value)">${esc(item.text||'')}</textarea>
+        </div>`).join('');
+      const addBtn=items.length<100?`<button class="btn btn-secondary btn-sm btn-full" style="margin-top:8px" onclick="addListItem('${key}')">＋ 追加 (${items.length}/100)</button>`:`<p style="color:var(--text-2);font-size:12px;margin-top:8px;text-align:center">上限(100個)に達しました</p>`;
+      return`<div class="list-field-wrap">${rows}${addBtn}</div>`;
+    }
+    if(!items.length)return`<span style="color:var(--text-2);font-size:13px">未入力</span>`;
+    return items.map(item=>`<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:3px">【${esc(item.name||'名称未設定')}】</div><div class="field-value-view">${esc(item.text||'')}</div></div>`).join('');
+  }
+  return'';
+}
+
+// ===== AUTOSAVE & CHANGE TRACKING =====
+let prevFieldSnapshot={};
+function snapshotFields(){
+  if(!currentMemo)return;
+  prevFieldSnapshot=JSON.parse(JSON.stringify(currentMemo.fieldValues||{}));
+}
+
+function onMemoChange(){
+  clearTimeout(autosaveTimer);
+  updateAutosave('保存中...');
+  autosaveTimer=setTimeout(saveMemoNow,500);
+}
+function onFieldChange(key,value){
+  if(!currentMemo)return;
+  pushUndoStack();
+  currentMemo.fieldValues[key]=value;
+  // 編集したら未設定扱いを解除
+  if(copiedUneditedKeys.has(key)){
+    copiedUneditedKeys.delete(key);
+    currentMemo.copiedUneditedKeys=(currentMemo.copiedUneditedKeys||[]).filter(k=>k!==key);
+  }
+  updateEmptyUI(key);
+  onMemoChange();
+}
+
+function toggleIndex(key,option,multiSelect){
+  if(!currentMemo)return;
+  pushUndoStack();
+  let val=currentMemo.fieldValues[key]||[];
+  if(!Array.isArray(val))val=[];
+  val=multiSelect?(val.includes(option)?val.filter(v=>v!==option):[...val,option]):(val.includes(option)?[]:[option]);
+  currentMemo.fieldValues[key]=val;
+  if(copiedUneditedKeys.has(key)){
+    copiedUneditedKeys.delete(key);
+    currentMemo.copiedUneditedKeys=(currentMemo.copiedUneditedKeys||[]).filter(k=>k!==key);
+  }
+  updateEmptyUI(key);
+  document.querySelectorAll(`[onclick*="toggleIndex('${key}'"]`).forEach(c=>c.classList.toggle('selected',val.includes(c.textContent)));
+  onMemoChange();
+}
+
+function onListItemChange(key,idx,field,value){
+  if(!currentMemo)return;
+  pushUndoStack();
+  const items=[...(currentMemo.fieldValues[key]||[])];
+  if(!items[idx])items[idx]={name:'',text:''};
+  items[idx]={...items[idx],[field]:value};
+  currentMemo.fieldValues[key]=items;
+  if(copiedUneditedKeys.has(key)){
+    copiedUneditedKeys.delete(key);
+    currentMemo.copiedUneditedKeys=(currentMemo.copiedUneditedKeys||[]).filter(k=>k!==key);
+  }
+  updateEmptyUI(key);
+  onMemoChange();
+}
+function addListItem(key){
+  if(!currentMemo)return;
+  pushUndoStack();
+  const items=[...(currentMemo.fieldValues[key]||[])];
+  if(items.length>=100){showToast('上限100個です');return;}
+  items.push({name:'',text:''});currentMemo.fieldValues[key]=items;
+  updateEmptyUI(key);
+  onMemoChange();renderMemoDetail();
+  setTimeout(()=>{const inputs=document.querySelectorAll('.list-item-block input');if(inputs.length)inputs[inputs.length-1].focus();},100);
+}
+function removeListItem(key,idx){
+  if(!currentMemo)return;
+  pushUndoStack();
+  const items=[...(currentMemo.fieldValues[key]||[])];items.splice(idx,1);
+  currentMemo.fieldValues[key]=items;
+  updateEmptyUI(key);
+  onMemoChange();renderMemoDetail();
+}
+
+async function saveMemoNow(){
+  if(!currentMemo)return;
+  const titleEl=document.getElementById('memo-title-field');
+  const oldTitle=currentMemo.title;
+  if(titleEl)currentMemo.title=titleEl.value.trim()||'（名称未設定）';
+
+  // Build history entries
+  const historyEntries=currentMemo.history||[];
+  const fmt=currentFormat;
+
+  // Check title change
+  if(titleEl&&currentMemo.title!==oldTitle){
+    historyEntries.unshift({time:now(),field:'キャラ名',before:oldTitle,after:currentMemo.title});
+  }
+
+  // Check field changes
+  if(fmt){
+    for(const sec of fmt.sections){
+      for(const field of sec.fields){
+        const key=`${sec.sectionId}_${field.fieldId}`;
+        const before=prevFieldSnapshot[key];
+        const after=currentMemo.fieldValues[key];
+        const beforeStr=JSON.stringify(before??'');
+        const afterStr=JSON.stringify(after??'');
+        if(beforeStr!==afterStr){
+          let beforeDisplay=displayVal(field,before);
+          let afterDisplay=displayVal(field,after);
+          historyEntries.unshift({time:now(),field:`${sec.name} › ${field.name}`,before:beforeDisplay,after:afterDisplay});
+        }
+      }
+    }
+  }
+
+  // Keep only last 100 history entries
+  currentMemo.history=historyEntries.slice(0,100);
+  currentMemo.updatedAt=now();
+  await dbPut('memos',currentMemo);
+  snapshotFields();
+  updateAutosave('saved');
+  const idx=allMemos.findIndex(m=>m.id===currentMemo.id);
+  if(idx>=0)allMemos[idx]={...currentMemo};
+}
+
+function displayVal(field,val){
+  if(field.type==='text')return typeof val==='string'?val.slice(0,50):'';
+  if(field.type==='index')return Array.isArray(val)?val.join('、'):'';
+  if(field.type==='image')return Array.isArray(val)?`${val.length}枚`:'0枚';
+  if(field.type==='list')return Array.isArray(val)?`${val.length}件`:'0件';
+  return'';
+}
+
+function updateAutosave(state){
+  const el=document.getElementById('autosave-indicator'),txt=document.getElementById('autosave-text');
+  if(!el)return;
+  if(state==='saved'){el.classList.add('saved');txt.textContent='保存済';setTimeout(()=>{el.classList.remove('saved');txt.textContent='—';},2000);}
+  else{el.classList.remove('saved');txt.textContent=state;}
+}
+
+// ===== COVER IMAGE =====
+function triggerCoverSelect(){document.getElementById('cover-file-input').click();}
+async function handleCoverFile(e){
+  const file=e.target.files[0];e.target.value='';
+  if(!file||!currentMemo)return;
+  const b64=await fileToBase64Single(file);
+  if(navigator.storage&&navigator.storage.estimate){
+    const est=await navigator.storage.estimate();
+    const used=est.usage||0;const quota=est.quota||0;
+    if(quota>0&&(used+b64.length*0.75)>quota*0.9){
+      showToast('ストレージ容量が不足しています。画像を追加できません。');return;
+    }
+  }
+  currentMemo.coverImage=b64;
+  await saveMemoNow();renderMemoDetail();showToast('カバー画像を設定しました');
+}
+function removeCoverImage(){
+  if(!currentMemo)return;currentMemo.coverImage=null;
+  onMemoChange();renderMemoDetail();
+}
+function fileToBase64Single(file){
+  return new Promise((res,rej)=>{
+    const img=new Image(),url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const MAX=3000;let{width:w,height:h}=img;
+      if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);res(c.toDataURL('image/png'));
+    };
+    img.onerror=()=>rej(new Error('読み込み失敗'));img.src=url;
+  });
+}
+
+// ===== IMAGES =====
+function triggerImageAdd(key){pendingImageKey=key;document.getElementById('image-file-input').click();}
+async function handleImageFiles(e){
+  const files=Array.from(e.target.files);e.target.value='';
+  if(!files.length||!currentMemo||!pendingImageKey)return;
+  const key=pendingImageKey;
+  const existing=Array.isArray(currentMemo.fieldValues[key])?currentMemo.fieldValues[key]:[];
+  const remaining=20-existing.length;
+  if(remaining<=0){showToast('画像は最大20枚です');return;}
+  showToast('画像を処理中...');
+  const newImgs=await Promise.all(files.slice(0,remaining).map(fileToBase64));
+  // 容量チェック
+  if(navigator.storage&&navigator.storage.estimate){
+    const est=await navigator.storage.estimate();
+    const used=est.usage||0;
+    const quota=est.quota||0;
+    // 追加データの概算サイズ
+    const addSize=newImgs.reduce((s,img)=>s+img.length*0.75,0);
+    if(quota>0&&(used+addSize)>quota*0.9){
+      showToast('ストレージ容量が不足しています。画像を追加できません。');
+      return;
+    }
+  }
+  currentMemo.fieldValues[key]=[...existing,...newImgs];
+  if(copiedUneditedKeys.has(key)){
+    copiedUneditedKeys.delete(key);
+    currentMemo.copiedUneditedKeys=(currentMemo.copiedUneditedKeys||[]).filter(k=>k!==key);
+  }
+  updateEmptyUI(key);
+  await saveMemoNow();renderMemoDetail();showToast(`${newImgs.length}枚追加しました`);
+}
+function fileToBase64(file){
+  return new Promise((res,rej)=>{
+    const img=new Image(),url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const MAX=3000;let{width:w,height:h}=img;
+      if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      const ctx=c.getContext('2d');
+      // PNGファイルは透過を保持、それ以外はJPEG
+      const isPng=file.type==='image/png';
+      if(!isPng){
+        // JPEGは透過なしなので白背景を塗る
+        ctx.fillStyle='#fff';
+        ctx.fillRect(0,0,w,h);
+      }
+      ctx.drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      res(isPng?c.toDataURL('image/png'):c.toDataURL('image/jpeg',0.95));
+    };
+    img.onerror=()=>rej(new Error('読み込み失敗'));img.src=url;
+  });
+}
+function removeImage(key,idx){
+  if(!currentMemo)return;
+  pushUndoStack();
+  const imgs=[...(currentMemo.fieldValues[key]||[])];imgs.splice(idx,1);
+  currentMemo.fieldValues[key]=imgs;
+  if(copiedUneditedKeys.has(key)){
+    copiedUneditedKeys.delete(key);
+    currentMemo.copiedUneditedKeys=(currentMemo.copiedUneditedKeys||[]).filter(k=>k!==key);
+  }
+  updateEmptyUI(key);
+  saveMemoNow();renderMemoDetail();
+}
+function openLightbox(key,idx){
+  lightboxImages=currentMemo?(currentMemo.fieldValues[key]||[]):[];
+  lightboxIdx=idx;
+  document.getElementById('lightbox-img').src=lightboxImages[idx]||'';
+  document.getElementById('lightbox').classList.add('active');
+}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('active');document.getElementById('lightbox-img').src='';}
+
+// ===== TAGS =====
+function onTagKeydown(e){
+  if(e.key!=='Enter')return;e.preventDefault();
+  const tag=e.target.value.trim();if(!tag||!currentMemo)return;
+  if((currentMemo.tags||[]).length>=50){showToast('タグは最大50個');return;}
+  if((currentMemo.tags||[]).includes(tag)){showToast('同じタグが既にあります');e.target.value='';return;}
+  currentMemo.tags=[...(currentMemo.tags||[]),tag];e.target.value='';
+  refreshTagArea();onMemoChange();
+}
+function removeTag(tag){if(!currentMemo)return;currentMemo.tags=(currentMemo.tags||[]).filter(t=>t!==tag);refreshTagArea();onMemoChange();}
+function refreshTagArea(){
+  const area=document.getElementById('tag-area');if(!area)return;
+  const savedVal=area.querySelector('input')?.value||'';
+  const tagItems=(currentMemo.tags||[]).map(t=>`<span class="tag-item">${esc(t)}<span class="tag-remove" onclick="removeTag('${esc(t)}')">×</span></span>`).join('');
+  area.innerHTML=tagItems;
+  const inp=document.createElement('input');inp.type='text';inp.id='tag-input';inp.placeholder='タグを入力してEnter';inp.maxLength=30;inp.value=savedVal;
+  inp.addEventListener('keydown',onTagKeydown);area.appendChild(inp);
+  const cnt=document.getElementById('tag-count');if(cnt)cnt.textContent=`${currentMemo.tags.length}/50`;
+}
+
+// ===== COPY TO =====
+function openCopyToModal(){
+  const candidates=allMemos.filter(m=>m.id!==currentMemo.id);
+  const el=document.getElementById('copy-to-list');
+  if(!candidates.length){
+    el.innerHTML=`<p style="color:var(--text-2);font-size:13px;padding:12px 0">コピー先のキャラがいません</p>`;
+    openModal('modal-copy-to');return;
+  }
+  el.innerHTML=candidates.map(m=>`
+    <div class="card" onclick="copyToMemo('${m.id}')">
+      <div class="card-title">${esc(m.title||'（名称未設定）')}</div>
+      <div class="card-sub">${esc(m.id)}</div>
+    </div>`).join('');
+  openModal('modal-copy-to');
+}
+async function copyToMemo(targetId){
+  const target=await dbGet('memos',targetId);
+  confirmDialog(
+    'コピーして上書き',
+    `「${currentMemo.title||currentMemo.id}」の内容を「${target.title||target.id}」に上書きします。よろしいですか？`,
+    'コピー',
+    async()=>{
+      const copied={
+        ...target,
+        fieldValues:JSON.parse(JSON.stringify(currentMemo.fieldValues||{})),
+        tags:[...(currentMemo.tags||[])],
+        coverImage:currentMemo.coverImage||null,
+        copiedUneditedKeys:Object.keys(currentMemo.fieldValues||{}),
+        updatedAt:now()
+      };
+      await dbPut('memos',copied);
+      closeModal('modal-copy-to');
+      showToast(`「${target.title||target.id}」にコピーしました`);
+    }
+  );
+}
+function openLinkSelectModal(){
+  const links=currentMemo.linkedMemos||[];
+  const candidates=allMemos.filter(m=>m.id!==currentMemo.id&&!links.includes(m.id));
+  const el=document.getElementById('link-select-list');
+  if(!candidates.length){el.innerHTML=`<p style="color:var(--text-2);font-size:13px;padding:12px 0">追加できるキャラがいません</p>`;openModal('modal-link-select');return;}
+  el.innerHTML=candidates.map(m=>`
+    <div class="card" onclick="addMemoLink('${m.id}')">
+      <div class="card-title">${esc(m.title||'（名称未設定）')}</div>
+      <div class="card-sub">${esc(m.id)}</div>
+    </div>`).join('');
+  openModal('modal-link-select');
+}
+function addMemoLink(targetId){
+  if(!currentMemo)return;
+  if(!(currentMemo.linkedMemos||[]).includes(targetId)){
+    currentMemo.linkedMemos=[...(currentMemo.linkedMemos||[]),targetId];
+  }
+  closeModal('modal-link-select');renderMemoDetail();onMemoChange();
+}
+function removeMemoLink(targetId){
+  if(!currentMemo)return;
+  currentMemo.linkedMemos=(currentMemo.linkedMemos||[]).filter(id=>id!==targetId);
+  renderMemoDetail();onMemoChange();
+}
+
+// ===== HISTORY =====
+function openHistoryModal(){
+  const history=(currentMemo?.history||[]);
+  const el=document.getElementById('history-list');
+  if(!history.length){el.innerHTML=`<p style="color:var(--text-2);font-size:13px;padding:12px 0">変更履歴がありません</p>`;openModal('modal-history');return;}
+  el.innerHTML=history.map(h=>{
+    const d=new Date(h.time);
+    const timeStr=`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    return`<div class="history-item">
+      <div class="history-time">${timeStr}</div>
+      <div class="history-field">${esc(h.field)}</div>
+      <div class="history-diff" style="color:var(--text-2);font-size:12px">${esc(h.before||'（空）')} → ${esc(h.after||'（空）')}</div>
+    </div>`;
+  }).join('');
+  openModal('modal-history');
+}
+
+// ===== TAG LIST SCREEN =====
+async function loadTagList(){
+  const memos=await dbGetAll('memos');
+  const groupMemos=memos.filter(m=>m.groupId===currentGroupId);
+  const tagMap={};
+  for(const m of groupMemos){
+    for(const t of (m.tags||[])){
+      if(!tagMap[t])tagMap[t]=[];
+      tagMap[t].push(m);
+    }
+  }
+  const el=document.getElementById('tag-list-body');
+  const tags=Object.keys(tagMap).sort();
+  if(!tags.length){el.innerHTML=`<div class="empty"><div class="empty-icon">🏷</div><div class="empty-text">タグがありません</div></div>`;return;}
+  el.innerHTML=tags.map(t=>`
+    <div class="tag-list-item" onclick="filterByTag('${esc(t)}')">
+      <span class="tag-list-name">${esc(t)}</span>
+      <span class="tag-list-count">${tagMap[t].length}件</span>
+    </div>`).join('');
+}
+function filterByTag(tag){
+  showScreen('screen-memos');
+  document.getElementById('search-input').value=tag;
+  filterMemos();
+}
+
+// ===== DELETE MEMO =====
+async function deleteMemo(memoId){
+  const m=await dbGet('memos',memoId);
+  confirmDialog('メモを削除',`「${m.title||m.id}」を完全に削除します。`,'削除',async()=>{
+    await dbDelete('memos',memoId);
+    if(currentMemoId===memoId){showScreen('screen-memos');currentMemoId=null;currentMemo=null;}
+    loadMemos();
+  });
+}
+
+// ===== FORMAT CHANGE =====
+async function openFormatChangeModal(){
+  const formats=await dbGetAll('formats');
+  document.getElementById('format-change-select').innerHTML=formats.map(f=>`<option value="${f.id}" ${f.id===currentMemo.formatId?'selected':''}>${esc(f.name)}</option>`).join('');
+  openModal('modal-format-change');
+}
+async function applyFormatChange(){
+  const newFmtId=document.getElementById('format-change-select').value;
+  if(newFmtId===currentMemo.formatId){closeModal('modal-format-change');return;}
+  const newFmt=await dbGet('formats',newFmtId);
+  const oldVals={...currentMemo.fieldValues},newVals={};
+  for(const sec of newFmt.sections)for(const f of sec.fields){
+    const key=`${sec.sectionId}_${f.fieldId}`;
+    newVals[key]=oldVals[key]!==undefined?oldVals[key]:(f.type==='text'?(f.template||''):[]);
+  }
+  currentMemo.formatId=newFmtId;currentMemo.fieldValues=newVals;currentFormat=newFmt;
+  await dbPut('memos',currentMemo);closeModal('modal-format-change');renderMemoDetail();
+}
+
+// ===== OUTPUT =====
+// ===== OUTPUT =====
+let currentOutputTab='format';
+let customChecked={}; // key -> bool
+
+function openOutputModal(){
+  if(!currentMemo||!currentFormat)return;
+  currentOutputTab='format';
+  customChecked={};
+  switchOutputTab('format');
+  openModal('modal-output');
+}
+
+function switchOutputTab(tab){
+  currentOutputTab=tab;
+  const tabs=['format','all','custom'];
+  tabs.forEach(t=>{
+    const btn=document.getElementById(`out-tab-${t}`);
+    if(btn){
+      btn.style.background=t===tab?'var(--accent)':'var(--bg-3)';
+      btn.style.color=t===tab?'#fff':'var(--text-1)';
+      btn.style.border=t===tab?'none':'1px solid var(--border-light)';
+    }
+  });
+  const textArea=document.getElementById('out-text-area');
+  const customArea=document.getElementById('out-custom-area');
+  const copyBtn=document.getElementById('out-copy-btn');
+  const genBtn=document.getElementById('out-generate-btn');
+  const customTextEl=document.getElementById('output-text-custom');
+
+  if(tab==='format'||tab==='all'){
+    textArea.style.display='block';
+    customArea.style.display='none';
+    copyBtn.style.display='flex';
+    genBtn.style.display='none';
+    // フォーマットタブ：出力セット選択UI表示
+    if(tab==='format'){
+      const sets=(currentFormat.outputSets||[]);
+      let setHtml='';
+      if(sets.length){
+        setHtml=`<div style="margin-bottom:10px">
+          <label style="font-size:11px;color:var(--text-2);letter-spacing:0.06em;text-transform:uppercase;display:block;margin-bottom:6px">出力セット</label>
+          <select class="field-select" id="out-set-select" onchange="onOutputSetChange()" style="font-size:13px;padding:8px 10px">
+            <option value="">フォーマット設定（出力フラグ）</option>
+            ${sets.map((s,i)=>`<option value="${i}">${esc(s.name)}</option>`).join('')}
+          </select>
+        </div>`;
+      }
+      const existing=document.getElementById('out-set-selector');
+      if(existing)existing.remove();
+      const div=document.createElement('div');div.id='out-set-selector';div.innerHTML=setHtml;
+      document.getElementById('out-text-area').prepend(div);
+    }
+    const out=buildOutput(tab);
+    document.getElementById('output-text').textContent=out||'（出力対象の入力がありません）';
+  } else {
+    textArea.style.display='none';
+    customArea.style.display='block';
+    copyBtn.style.display='none';
+    genBtn.style.display='flex';
+    customTextEl.style.display='none';
+    renderCustomSelector();
+  }
+}
+
+function onOutputSetChange(){
+  const sel=document.getElementById('out-set-select');
+  if(!sel)return;
+  const idx=sel.value===''?null:parseInt(sel.value);
+  const out=buildOutput('format',idx);
+  document.getElementById('output-text').textContent=out||'（出力対象の入力がありません）';
+}
+
+function buildOutput(mode,setIdx=null){
+  const m=currentMemo;
+  let out='';
+  const set=setIdx!==null?(currentFormat.outputSets||[])[setIdx]:null;
+  for(const sec of[...currentFormat.sections].sort((a,b)=>a.order-b.order)){
+    let secOut='';
+    const fields=[...sec.fields].sort((a,b)=>a.order-b.order).filter(f=>f.type!=='image');
+    for(const field of fields){
+      const key=`${sec.sectionId}_${field.fieldId}`,val=m.fieldValues[key];
+      if(mode==='format'){
+        if(set){
+          if(!set.fieldKeys.includes(key))continue;
+        }else{
+          if(!field.exportable)continue;
+        }
+      }
+      let text=getFieldText(field,val,key);
+      if(text)secOut+=`【${field.name}】\n${text}\n`;
+    }
+    if(secOut)out+=`■ ${sec.name}\n${secOut}\n`;
+  }
+  let result=out.trim();
+  // 語頭・語尾を追加
+  if(set){
+    if(set.useHeader&&set.header&&set.header.trim())result=set.header.trim()+'\n\n'+result;
+    if(set.useFooter&&set.footer&&set.footer.trim())result=result+'\n\n'+set.footer.trim();
+  }
+  return result;
+}
+
+function buildCustomOutput(){
+  const m=currentMemo;
+  let out='';
+  for(const sec of[...currentFormat.sections].sort((a,b)=>a.order-b.order)){
+    let secOut='';
+    const fields=[...sec.fields].sort((a,b)=>a.order-b.order).filter(f=>f.type!=='image');
+    for(const field of fields){
+      const key=`${sec.sectionId}_${field.fieldId}`;
+      if(!customChecked[key])continue;
+      const val=m.fieldValues[key];
+      let text=getFieldText(field,val,key);
+      if(text)secOut+=`【${field.name}】\n${text}\n`;
+    }
+    if(secOut)out+=`■ ${sec.name}\n${secOut}\n`;
+  }
+  return out.trim();
+}
+
+function getFieldText(field,val,key){
+  if(field.type==='text'){
+    const t=typeof val==='string'?val.trim():'';
+    return(field.template&&t===field.template.trim())?'':t;
+  }
+  if(field.type==='index')return Array.isArray(val)?val.join('、'):'';
+  if(field.type==='list'){
+    const items=Array.isArray(val)?val:[];
+    return items.filter(item=>item.name||item.text).map(item=>`【${item.name||'名称未設定'}】\n${item.text||''}`).join('\n');
+  }
+  return'';
+}
+
+function renderCustomSelector(){
+  const el=document.getElementById('out-custom-list');
+  const sections=[...currentFormat.sections].sort((a,b)=>a.order-b.order);
+  // 初期化: 未設定でないものはデフォルトチェック
+  if(!Object.keys(customChecked).length){
+    for(const sec of sections){
+      for(const f of sec.fields){
+        if(f.type==='image')continue;
+        const key=`${sec.sectionId}_${f.fieldId}`;
+        const val=currentMemo.fieldValues[key];
+        customChecked[key]=!isEmptyVal(f,val,key);
+      }
+    }
+  }
+  el.innerHTML=sections.map(sec=>{
+    const fields=sec.fields.filter(f=>f.type!=='image').sort((a,b)=>a.order-b.order);
+    if(!fields.length)return'';
+    const allChecked=fields.every(f=>customChecked[`${sec.sectionId}_${f.fieldId}`]);
+    const sid=`csec_${sec.sectionId}`;
+    const fieldItems=fields.map(f=>{
+      const key=`${sec.sectionId}_${f.fieldId}`;
+      const checked=customChecked[key]?'checked':'';
+      const isEmpty=isEmptyVal(f,currentMemo.fieldValues[key],key);
+      const emptyMark=isEmpty?`<span style="font-size:10px;color:var(--text-2);margin-left:4px">未設定</span>`:'';
+      return`<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg-2)" onclick="toggleCustomField('${key}','${sec.sectionId}')">
+        <div style="width:18px;height:18px;border-radius:4px;border:2px solid ${checked?'var(--accent)':'var(--border-light)'};background:${checked?'var(--accent)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          ${checked?'<span style="color:#fff;font-size:12px;line-height:1">✓</span>':''}
+        </div>
+        <span style="font-size:13px;flex:1">${esc(f.name)}${emptyMark}</span>
+      </div>`;
+    }).join('');
+    return`<div style="margin-bottom:10px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg-3)">
+        <div style="width:18px;height:18px;border-radius:4px;border:2px solid ${allChecked?'var(--accent)':'var(--border-light)'};background:${allChecked?'var(--accent)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer" id="csec-check-${sec.sectionId}" onclick="toggleCustomSection_check(${sec.sectionId})">
+          ${allChecked?'<span style="color:#fff;font-size:12px;line-height:1">✓</span>':''}
+        </div>
+        <span style="font-size:13px;font-weight:700;color:var(--accent);flex:1;cursor:pointer" onclick="toggleCustomSection('${sec.sectionId}')">▸ ${esc(sec.name)}</span>
+        <span style="font-size:11px;color:var(--text-2);cursor:pointer" id="csec-toggle-${sec.sectionId}" onclick="toggleCustomSection('${sec.sectionId}')">開く</span>
+      </div>
+      <div id="${sid}" style="display:none">${fieldItems}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCustomSection(secId){
+  const body=document.getElementById(`csec_${secId}`);
+  const label=document.getElementById(`csec-toggle-${secId}`);
+  if(!body)return;
+  const isOpen=body.style.display!=='none';
+  body.style.display=isOpen?'none':'block';
+  if(label)label.textContent=isOpen?'開く':'閉じる';
+}
+
+function toggleCustomField(key,secId){
+  customChecked[key]=!customChecked[key];
+  // 大項目チェック状態を更新
+  updateSectionCheck(parseInt(secId));
+  renderCustomSelector();
+}
+
+function toggleCustomSection_check(secId){
+  // 大項目チェックは全ON/全OFFのトグル
+  const sec=currentFormat.sections.find(s=>s.sectionId===secId);
+  if(!sec)return;
+  const fields=sec.fields.filter(f=>f.type!=='image');
+  const allChecked=fields.every(f=>customChecked[`${sec.sectionId}_${f.fieldId}`]);
+  for(const f of fields){
+    customChecked[`${sec.sectionId}_${f.fieldId}`]=!allChecked;
+  }
+  renderCustomSelector();
+}
+
+function updateSectionCheck(secId){
+  // 中の項目を1つでも外したら大項目チェック外れる（re-renderで対応）
+}
+
+function generateCustomOutput(){
+  const out=buildCustomOutput();
+  const el=document.getElementById('output-text-custom');
+  el.textContent=out||'（選択された項目がありません）';
+  el.style.display='block';
+  document.getElementById('out-copy-btn').style.display='flex';
+  document.getElementById('out-generate-btn').style.display='none';
+}
+
+async function copyOutput(){
+  const isCustom=currentOutputTab==='custom';
+  const el=isCustom?document.getElementById('output-text-custom'):document.getElementById('output-text');
+  const text=el?el.textContent:'';
+  try{await navigator.clipboard.writeText(text);showToast('コピーしました');}
+  catch{showToast('コピーに失敗しました');}
+}
+
+// ===== FORMATS =====
+async function loadFormats(){
+  const formats=await dbGetAll('formats');const el=document.getElementById('format-list');
+  if(!formats.length){el.innerHTML=`<div class="empty"><div class="empty-icon">⊞</div><div class="empty-text">フォーマットがありません<br>下のボタンから作成してください</div></div>`;return;}
+  el.innerHTML=formats.map(f=>{
+    const sc=f.sections.length,fc=f.sections.reduce((s,sec)=>s+sec.fields.length,0);
+    return`<div class="card"><div style="display:flex;align-items:center;gap:8px">
+      <div style="flex:1;min-width:0"><div class="card-title">${esc(f.name)}</div><div class="card-sub">大項目 ${sc}個 / 項目 ${fc}個</div></div>
+      <button class="btn-icon" style="width:32px;height:32px;font-size:13px" onclick="duplicateFormat('${f.id}')" title="複製">⧉</button>
+      <button class="btn-icon" style="width:32px;height:32px;font-size:13px" onclick="openFormatEditModal('${f.id}')">✏</button>
+      <button class="btn-icon" style="width:32px;height:32px;font-size:13px;color:var(--danger)" onclick="deleteFormat('${f.id}')">✕</button>
+    </div></div>`;
+  }).join('');
+}
+
+async function duplicateFormat(id){
+  const src=await dbGet('formats',id);
+  const copy={...src,id:uuid(),name:src.name+'_コピー',sections:JSON.parse(JSON.stringify(src.sections)),createdAt:now(),updatedAt:now()};
+  await dbPut('formats',copy);loadFormats();showToast('フォーマットを複製しました');
+}
+
+function openFormatCreateModal(){
+  editingFormatId=null;document.getElementById('modal-format-title').textContent='フォーマットを作成';
+  document.getElementById('format-name-input').value='';pendingSections=[];pendingOutputSets=[];
+  Object.keys(formatCollapseState).forEach(k=>delete formatCollapseState[k]);
+  renderPendingSections();renderPendingOutputSets();openModal('modal-format');setTimeout(()=>document.getElementById('format-name-input').focus(),300);
+}
+async function openFormatEditModal(id){
+  editingFormatId=id;const fmt=await dbGet('formats',id);
+  document.getElementById('modal-format-title').textContent='フォーマットを編集';
+  document.getElementById('format-name-input').value=fmt.name;
+  pendingSections=fmt.sections.map(s=>({...s,fields:s.fields.map(f=>({...f,indexOptions:[...(f.indexOptions||[])]})) }));
+  pendingOutputSets=(fmt.outputSets||[]).map(s=>({...s,fieldKeys:[...(s.fieldKeys||[])]}));
+  Object.keys(formatCollapseState).forEach(k=>delete formatCollapseState[k]);
+  renderPendingSections();renderPendingOutputSets();openModal('modal-format');
+}
+function renderPendingSections(){
+  const el=document.getElementById('format-sections-list');
+  if(!pendingSections.length){el.innerHTML=`<p style="color:var(--text-2);font-size:13px;padding:12px 0">大項目がありません。「＋ 大項目を追加」から追加してください。</p>`;return;}
+  el.innerHTML=pendingSections.map((sec,si)=>{
+    const fieldItems=sec.fields.map((f,fi)=>{
+      const tb=f.type==='text'?`<span class="badge badge-text">TEXT</span>`:f.type==='index'?`<span class="badge badge-index">INDEX</span>`:f.type==='list'?`<span class="badge badge-list">LIST</span>`:`<span class="badge badge-image">IMAGE</span>`;
+      const eb=f.exportable&&f.type!=='image'?`<span class="badge badge-export">出力</span>`:'';
+      return`<div class="child-field-item">
+        <div class="child-field-body"><div class="child-field-name">${esc(f.name||'（名称未設定）')}</div><div class="child-field-meta">${tb} ${eb}</div></div>
+        <div class="child-field-actions">
+          <button class="btn-icon" style="width:26px;height:26px;font-size:11px" onclick="editChildField(${si},${fi})">✏</button>
+          ${fi>0?`<button class="btn-icon" style="width:26px;height:26px;font-size:11px" onclick="moveChildField(${si},${fi},-1)">↑</button>`:'<div style="width:26px"></div>'}
+          ${fi<sec.fields.length-1?`<button class="btn-icon" style="width:26px;height:26px;font-size:11px" onclick="moveChildField(${si},${fi},1)">↓</button>`:'<div style="width:26px"></div>'}
+          <button class="btn-icon" style="width:26px;height:26px;font-size:11px;color:var(--danger)" onclick="removeChildField(${si},${fi})">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+    return`<div class="section-item">
+      <div class="section-item-header" id="fmthdr_${si}" onclick="toggleFormatSection(${si})">
+        <span class="section-item-arrow">▸</span>
+        <span class="section-item-name">${esc(sec.name)}</span>
+        <div style="display:flex;gap:3px" onclick="event.stopPropagation()">
+          <button class="btn-icon" style="width:26px;height:26px;font-size:11px" onclick="editSectionName(${si})">✏</button>
+          ${si>0?`<button class="btn-icon" style="width:26px;height:26px;font-size:11px" onclick="moveSection(${si},-1)">↑</button>`:'<div style="width:26px"></div>'}
+          ${si<pendingSections.length-1?`<button class="btn-icon" style="width:26px;height:26px;font-size:11px" onclick="moveSection(${si},1)">↓</button>`:'<div style="width:26px"></div>'}
+          <button class="btn-icon" style="width:26px;height:26px;font-size:11px;color:var(--danger)" onclick="removeSection(${si})">✕</button>
+        </div>
+      </div>
+      <div class="section-item-body" id="fmtbdy_${si}">${fieldItems}<button class="btn btn-secondary btn-sm btn-full mt-8" onclick="addChildField(${si})">＋ 項目を追加</button></div>
+    </div>`;
+  }).join('');
+  applyFormatCollapseState();
+}
+
+function addSection(){editingSectionIdx=null;document.getElementById('modal-section-name-title').textContent='大項目を追加';document.getElementById('section-name-input').value='';openModal('modal-section-name');setTimeout(()=>document.getElementById('section-name-input').focus(),300);}
+function editSectionName(si){editingSectionIdx=si;document.getElementById('modal-section-name-title').textContent='大項目名を編集';document.getElementById('section-name-input').value=pendingSections[si].name;openModal('modal-section-name');setTimeout(()=>document.getElementById('section-name-input').focus(),300);}
+function saveSectionName(){
+  const name=document.getElementById('section-name-input').value.trim();if(!name){showToast('大項目名を入力してください');return;}
+  if(editingSectionIdx!==null){pendingSections[editingSectionIdx].name=name;}
+  else{const maxId=pendingSections.reduce((m,s)=>Math.max(m,s.sectionId||0),0);pendingSections.push({sectionId:maxId+1,name,order:pendingSections.length,fields:[]});}
+  closeModal('modal-section-name');renderPendingSections();
+}
+function moveSection(si,dir){const j=si+dir;if(j<0||j>=pendingSections.length)return;[pendingSections[si],pendingSections[j]]=[pendingSections[j],pendingSections[si]];pendingSections.forEach((s,i)=>s.order=i);renderPendingSections();}
+function removeSection(si){pendingSections.splice(si,1);pendingSections.forEach((s,i)=>s.order=i);renderPendingSections();}
+
+function addChildField(si){editingSectionIdx=si;editingFieldIdx=null;resetFieldModal();document.getElementById('modal-field-title').textContent='項目を追加';openModal('modal-field-edit');setTimeout(()=>document.getElementById('field-name-input').focus(),300);}
+function editChildField(si,fi){
+  editingSectionIdx=si;editingFieldIdx=fi;const f=pendingSections[si].fields[fi];
+  document.getElementById('modal-field-title').textContent='項目を編集';
+  document.getElementById('field-name-input').value=f.name||'';
+  document.getElementById('field-type-input').value=f.type||'text';
+  document.getElementById('field-template-input').value=f.template||'';
+  document.getElementById('field-export-input').checked=f.exportable!==false;
+  document.getElementById('field-multi-input').checked=f.multiSelect||false;
+  renderFieldOptions(f.indexOptions||[]);onFieldTypeChange();openModal('modal-field-edit');
+}
+function moveChildField(si,fi,dir){const fields=pendingSections[si].fields,j=fi+dir;if(j<0||j>=fields.length)return;[fields[fi],fields[j]]=[fields[j],fields[fi]];fields.forEach((f,i)=>f.order=i);renderPendingSections();}
+function removeChildField(si,fi){pendingSections[si].fields.splice(fi,1);pendingSections[si].fields.forEach((f,i)=>f.order=i);renderPendingSections();}
+
+function resetFieldModal(){
+  document.getElementById('field-name-input').value='';document.getElementById('field-type-input').value='text';
+  document.getElementById('field-template-input').value='';document.getElementById('field-export-input').checked=true;
+  document.getElementById('field-multi-input').checked=false;renderFieldOptions([]);onFieldTypeChange();
+}
+function onFieldTypeChange(){
+  const t=document.getElementById('field-type-input').value;
+  document.getElementById('field-text-opts').style.display=t==='text'?'block':'none';
+  document.getElementById('field-index-opts').style.display=t==='index'?'block':'none';
+  document.getElementById('field-image-opts').style.display=t==='image'?'block':'none';
+  document.getElementById('field-list-opts').style.display=t==='list'?'block':'none';
+}
+function renderFieldOptions(opts){
+  document.getElementById('field-options-list').innerHTML=opts.map((o,i)=>
+    `<div class="option-item"><input class="field-input" type="text" value="${esc(o)}" placeholder="選択肢"><button class="btn-icon" style="width:32px;height:32px;font-size:13px;color:var(--danger)" onclick="removeFieldOption(${i})">✕</button></div>`
+  ).join('');
+}
+function getFieldOptions(){return Array.from(document.querySelectorAll('#field-options-list .option-item input')).map(i=>i.value.trim()).filter(Boolean);}
+function addFieldOption(){renderFieldOptions([...getFieldOptions(),'']);const inputs=document.querySelectorAll('#field-options-list .option-item input');if(inputs.length)inputs[inputs.length-1].focus();}
+function removeFieldOption(i){const opts=getFieldOptions();opts.splice(i,1);renderFieldOptions(opts);}
+function saveFieldEdit(){
+  const name=document.getElementById('field-name-input').value.trim();if(!name){showToast('項目名を入力してください');return;}
+  const type=document.getElementById('field-type-input').value;
+  const template=document.getElementById('field-template-input').value;
+  const exportable=document.getElementById('field-export-input').checked;
+  const multiSelect=document.getElementById('field-multi-input').checked;
+  const indexOptions=type==='index'?getFieldOptions():[];
+  if(type==='index'&&!indexOptions.length){showToast('選択肢を1つ以上追加してください');return;}
+  const fieldData={name,type,exportable,template,indexOptions,multiSelect};
+  const fields=pendingSections[editingSectionIdx].fields;
+  if(editingFieldIdx!==null){fields[editingFieldIdx]={...fields[editingFieldIdx],...fieldData};}
+  else{const maxId=fields.reduce((m,f)=>Math.max(m,f.fieldId||0),0);fields.push({fieldId:maxId+1,order:fields.length,...fieldData});}
+  renderPendingSections();closeModal('modal-field-edit');
+}
+async function saveFormat(){
+  const name=document.getElementById('format-name-input').value.trim();if(!name){showToast('フォーマット名を入力してください');return;}
+  const sections=pendingSections.map((s,i)=>({...s,order:i,fields:s.fields.map((f,j)=>({...f,order:j}))}));
+  if(editingFormatId){
+    const fmt=await dbGet('formats',editingFormatId);fmt.name=name;fmt.sections=sections;fmt.outputSets=pendingOutputSets;fmt.updatedAt=now();
+    await dbPut('formats',fmt);
+    const memos=await dbGetAll('memos');
+    for(const memo of memos.filter(m=>m.formatId===editingFormatId)){
+      const newVals={};
+      for(const sec of sections)for(const f of sec.fields){
+        const key=`${sec.sectionId}_${f.fieldId}`;
+        newVals[key]=memo.fieldValues[key]!==undefined?memo.fieldValues[key]:(f.type==='text'?(f.template||''):[]);
+      }
+      memo.fieldValues=newVals;memo.updatedAt=now();await dbPut('memos',memo);
+    }
+  }else{
+    await dbPut('formats',{id:uuid(),name,sections,outputSets:pendingOutputSets,createdAt:now(),updatedAt:now()});
+  }
+  closeModal('modal-format');loadFormats();showToast('保存しました');
+}
+async function deleteFormat(id){
+  const fmt=await dbGet('formats',id),memos=await dbGetAll('memos');
+  const used=memos.filter(m=>m.formatId===id).length;
+  const warnMsg=`「${fmt.name}」を削除します。`+(used?`\n※${used}件のメモで使用中です。`:'');
+  confirmDialog('フォーマットを削除',warnMsg,'削除',async()=>{await dbDelete('formats',id);loadFormats();});
+}
+
+
+// ===== MEMO LOCK =====
+async function toggleMemoLock(memoId){
+  const m=await dbGet('memos',memoId);
+  if(m.locked){
+    confirmDialog('ロック解除','このメモのロックを解除しますか？','解除',async()=>{
+      m.locked=false;await dbPut('memos',m);
+      if(currentMemoId===memoId){currentMemo.locked=false;renderMemoDetail();}
+      loadMemos();showToast('ロック解除しました');
+    });
+  }else{
+    confirmDialog('メモをロック','ロックすると編集できなくなります。','ロック',async()=>{
+      m.locked=true;await dbPut('memos',m);
+      if(currentMemoId===memoId){currentMemo.locked=true;renderMemoDetail();}
+      loadMemos();showToast('ロックしました');
+    });
+  }
+}
+
+// ===== OUTPUT SETS =====
+function addOutputSet(){
+  editingOutputSetIdx=null;
+  document.getElementById('modal-outputset-name-title').textContent='出力セットを追加';
+  document.getElementById('outputset-name-input').value='';
+  openModal('modal-outputset-name');
+  setTimeout(()=>document.getElementById('outputset-name-input').focus(),300);
+}
+function saveOutputSetName(){
+  const name=document.getElementById('outputset-name-input').value.trim();
+  if(!name){showToast('セット名を入力してください');return;}
+  if(editingOutputSetIdx!==null){
+    pendingOutputSets[editingOutputSetIdx].name=name;
+  }else{
+    const maxId=pendingOutputSets.reduce((m,s)=>Math.max(m,s.setId||0),0);
+    pendingOutputSets.push({setId:maxId+1,name,fieldKeys:[]});
+  }
+  closeModal('modal-outputset-name');
+  renderPendingOutputSets();
+}
+function renderPendingOutputSets(){
+  const el=document.getElementById('format-outputsets-list');
+  if(!el)return;
+  if(!pendingOutputSets.length){
+    el.innerHTML=`<p style="color:var(--text-2);font-size:12px;padding:8px 0">出力セットがありません。</p>`;
+    return;
+  }
+  // 全フィールドリストを作成
+  const allFields=[];
+  for(const sec of pendingSections){
+    for(const f of sec.fields){
+      if(f.type==='image')continue;
+      allFields.push({key:`${sec.sectionId}_${f.fieldId}`,label:`${sec.name} › ${f.name}`});
+    }
+  }
+  el.innerHTML=pendingOutputSets.map((set,si)=>{
+    const fieldChecks=allFields.map(f=>{
+      const checked=set.fieldKeys.includes(f.key);
+      return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer" onclick="toggleOutputSetField(${si},'${f.key}')">
+        <div style="width:16px;height:16px;border-radius:3px;border:2px solid ${checked?'var(--accent)':'var(--border-light)'};background:${checked?'var(--accent)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          ${checked?'<span style="color:#fff;font-size:10px">✓</span>':''}
+        </div>
+        <span style="font-size:12px;color:var(--text-1)">${esc(f.label)}</span>
+      </div>`;
+    }).join('');
+    const hasHeader=set.useHeader||false;
+    const hasFooter=set.useFooter||false;
+    return`<div style="background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:13px;font-weight:600;flex:1;color:var(--text-0)">${esc(set.name)}</span>
+        <button class="btn-icon" style="width:26px;height:26px;font-size:11px" onclick="renameOutputSet(${si})">✏</button>
+        <button class="btn-icon" style="width:26px;height:26px;font-size:11px;color:var(--danger)" onclick="removeOutputSet(${si})">✕</button>
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer" onclick="toggleOutputSetOption(${si},'useHeader')">
+          <div style="width:16px;height:16px;border-radius:3px;border:2px solid ${hasHeader?'var(--accent)':'var(--border-light)'};background:${hasHeader?'var(--accent)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            ${hasHeader?'<span style="color:#fff;font-size:10px">✓</span>':''}
+          </div>
+          <span style="font-size:12px;color:var(--text-1)">語頭テキストを追加</span>
+        </div>
+        ${hasHeader?`<textarea class="field-textarea" style="min-height:60px;font-size:13px" placeholder="出力の先頭に追加するテキスト..." oninput="updateOutputSetText(${si},'header',this.value)">${esc(set.header||'')}</textarea>`:''}
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer" onclick="toggleOutputSetOption(${si},'useFooter')">
+          <div style="width:16px;height:16px;border-radius:3px;border:2px solid ${hasFooter?'var(--accent)':'var(--border-light)'};background:${hasFooter?'var(--accent)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            ${hasFooter?'<span style="color:#fff;font-size:10px">✓</span>':''}
+          </div>
+          <span style="font-size:12px;color:var(--text-1)">語尾テキストを追加</span>
+        </div>
+        ${hasFooter?`<textarea class="field-textarea" style="min-height:60px;font-size:13px" placeholder="出力の末尾に追加するテキスト..." oninput="updateOutputSetText(${si},'footer',this.value)">${esc(set.footer||'')}</textarea>`:''}
+      </div>
+      <div style="font-size:11px;color:var(--text-2);margin-bottom:6px;letter-spacing:0.05em">出力項目</div>
+      <div style="max-height:150px;overflow-y:auto">${fieldChecks||'<p style="color:var(--text-2);font-size:12px">大項目・項目を先に追加してください</p>'}</div>
+    </div>`;
+  }).join('');
+}
+function toggleOutputSetField(si,key){
+  const set=pendingOutputSets[si];
+  if(set.fieldKeys.includes(key))set.fieldKeys=set.fieldKeys.filter(k=>k!==key);
+  else set.fieldKeys.push(key);
+  renderPendingOutputSets();
+}
+function toggleOutputSetOption(si,prop){
+  pendingOutputSets[si][prop]=!pendingOutputSets[si][prop];
+  renderPendingOutputSets();
+}
+function updateOutputSetText(si,prop,value){
+  pendingOutputSets[si][prop]=value;
+}
+function renameOutputSet(si){
+  editingOutputSetIdx=si;
+  document.getElementById('modal-outputset-name-title').textContent='セット名を編集';
+  document.getElementById('outputset-name-input').value=pendingOutputSets[si].name;
+  openModal('modal-outputset-name');
+  setTimeout(()=>document.getElementById('outputset-name-input').focus(),300);
+}
+function removeOutputSet(si){
+  pendingOutputSets.splice(si,1);
+  renderPendingOutputSets();
+}
+
+// ===== IMAGE SAVE =====
+function saveImageToDevice(src){
+  const a=document.createElement('a');
+  a.href=src;
+  const ext=src.startsWith('data:image/png')?'png':'jpg';
+  a.download='charamemo_image_'+Date.now()+'.'+ext;
+  a.click();
+  showToast('画像を保存しました');
+}
+
+// ===== ICON TRIMMER =====
+let trimmerSrc='';
+let trimmerCanvas=null;
+let trimmerCtx=null;
+let trimmerImg=null;
+let trimmerDrag=false;
+let trimmerPinch=false;
+let trimmerX=0,trimmerY=0,trimmerStartX=0,trimmerStartY=0;
+let trimmerBoxSize=200; // 切り取り枠サイズ（固定）
+let trimmerImgX=0,trimmerImgY=0,trimmerImgW=0,trimmerImgH=0;
+let trimmerImgBaseW=0,trimmerImgBaseH=0;
+let trimmerZoom=1;
+let trimmerPinchDist0=0;
+let trimmerZoom0=1;
+
+function openTrimmer(src){
+  trimmerSrc=src;
+  document.getElementById('modal-trimmer').classList.add('active');
+  setTimeout(()=>initTrimmer(src),150);
+}
+function initTrimmer(src){
+  const canvas=document.getElementById('trimmer-canvas');
+  trimmerCanvas=canvas;
+  trimmerCtx=canvas.getContext('2d');
+  const img=new Image();
+  img.onload=()=>{
+    // 表示用に最大1200pxに縮小したプレビュー画像を作成
+    const PREV_MAX=1200;
+    let pw=img.width,ph=img.height;
+    if(pw>PREV_MAX||ph>PREV_MAX){
+      if(pw>ph){ph=Math.round(ph*PREV_MAX/pw);pw=PREV_MAX;}
+      else{pw=Math.round(pw*PREV_MAX/ph);ph=PREV_MAX;}
+    }
+    const prevCanvas=document.createElement('canvas');
+    prevCanvas.width=pw;prevCanvas.height=ph;
+    prevCanvas.getContext('2d').drawImage(img,0,0,pw,ph);
+    const prevImg=new Image();
+    prevImg.onload=()=>{
+      trimmerImg=prevImg;
+      // 元画像も保持（高解像度出力用）
+      trimmerImg._orig=img;
+      trimmerImg._origW=img.width;
+      trimmerImg._origH=img.height;
+      trimmerImg._prevW=pw;
+      trimmerImg._prevH=ph;
+      const maxW=Math.min(window.innerWidth-40,380);
+      const maxH=320;
+      canvas.width=maxW;
+      canvas.height=maxH;
+      trimmerBoxSize=Math.min(maxW,maxH)*0.7;
+      const fitScale=Math.max(trimmerBoxSize/pw, trimmerBoxSize/ph);
+      trimmerZoom=1;
+      trimmerImgBaseW=pw*fitScale;
+      trimmerImgBaseH=ph*fitScale;
+      trimmerImgW=trimmerImgBaseW;
+      trimmerImgH=trimmerImgBaseH;
+      trimmerImgX=(maxW-trimmerImgW)/2;
+      trimmerImgY=(maxH-trimmerImgH)/2;
+      drawTrimmer();
+    };
+    prevImg.src=prevCanvas.toDataURL('image/jpeg',0.9);
+  };
+  img.src=src;
+}
+function drawTrimmer(){
+  const c=trimmerCanvas,ctx=trimmerCtx;
+  const bx=(c.width-trimmerBoxSize)/2;
+  const by=(c.height-trimmerBoxSize)/2;
+  ctx.clearRect(0,0,c.width,c.height);
+  // 画像描画
+  ctx.drawImage(trimmerImg,trimmerImgX,trimmerImgY,trimmerImgW,trimmerImgH);
+  // 暗いオーバーレイ（枠外）
+  ctx.fillStyle='rgba(0,0,0,0.55)';
+  ctx.fillRect(0,0,c.width,c.height);
+  // 枠内を再描画（クリア）
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(bx,by,trimmerBoxSize,trimmerBoxSize);
+  ctx.clip();
+  ctx.drawImage(trimmerImg,trimmerImgX,trimmerImgY,trimmerImgW,trimmerImgH);
+  ctx.restore();
+  // 枠線
+  ctx.strokeStyle='rgba(255,255,255,0.9)';
+  ctx.lineWidth=2;
+  ctx.strokeRect(bx,by,trimmerBoxSize,trimmerBoxSize);
+  // 三分割線
+  ctx.strokeStyle='rgba(255,255,255,0.3)';
+  ctx.lineWidth=1;
+  for(let i=1;i<3;i++){
+    ctx.beginPath();ctx.moveTo(bx+trimmerBoxSize*i/3,by);ctx.lineTo(bx+trimmerBoxSize*i/3,by+trimmerBoxSize);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(bx,by+trimmerBoxSize*i/3);ctx.lineTo(bx+trimmerBoxSize,by+trimmerBoxSize*i/3);ctx.stroke();
+  }
+}
+function getTouchPos(e){
+  const r=trimmerCanvas.getBoundingClientRect();
+  const sx=trimmerCanvas.width/r.width;
+  const sy=trimmerCanvas.height/r.height;
+  if(e.touches&&e.touches.length>=1){
+    return{x:(e.touches[0].clientX-r.left)*sx,y:(e.touches[0].clientY-r.top)*sy};
+  }
+  return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};
+}
+function trimmerPointerDown(e){
+  e.preventDefault();
+  if(e.touches&&e.touches.length===2){
+    trimmerPinch=true;trimmerDrag=false;
+    trimmerPinchDist0=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    trimmerZoom0=trimmerZoom;
+    return;
+  }
+  trimmerDrag=true;trimmerPinch=false;
+  const p=getTouchPos(e);
+  trimmerStartX=p.x-trimmerImgX;
+  trimmerStartY=p.y-trimmerImgY;
+}
+function trimmerPointerMove(e){
+  e.preventDefault();
+  if(trimmerPinch&&e.touches&&e.touches.length===2){
+    const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    const zoom=trimmerZoom0*(dist/trimmerPinchDist0);
+    setTrimmerZoom(zoom);
+    return;
+  }
+  if(!trimmerDrag)return;
+  const p=getTouchPos(e);
+  trimmerImgX=p.x-trimmerStartX;
+  trimmerImgY=p.y-trimmerStartY;
+  drawTrimmer();
+}
+function trimmerPointerUp(e){trimmerDrag=false;trimmerPinch=false;}
+function setTrimmerZoom(zoom){
+  const minZoom=trimmerBoxSize/Math.max(trimmerImgBaseW,trimmerImgBaseH)*0.5;
+  trimmerZoom=Math.max(minZoom,Math.min(5,zoom));
+  // 中心を基準にスケール
+  const cx=trimmerCanvas.width/2;
+  const cy=trimmerCanvas.height/2;
+  const prevCX=(cx-trimmerImgX)/trimmerImgW;
+  const prevCY=(cy-trimmerImgY)/trimmerImgH;
+  trimmerImgW=trimmerImgBaseW*trimmerZoom;
+  trimmerImgH=trimmerImgBaseH*trimmerZoom;
+  trimmerImgX=cx-prevCX*trimmerImgW;
+  trimmerImgY=cy-prevCY*trimmerImgH;
+  drawTrimmer();
+}
+function trimmerZoomIn(){setTrimmerZoom(trimmerZoom*1.2);}
+function trimmerZoomOut(){setTrimmerZoom(trimmerZoom/1.2);}
+
+function applyTrimmer(){
+  const bx=(trimmerCanvas.width-trimmerBoxSize)/2;
+  const by=(trimmerCanvas.height-trimmerBoxSize)/2;
+  // プレビュー上の座標→元画像の座標に変換
+  const prevW=trimmerImg._prevW||trimmerImg.width;
+  const prevH=trimmerImg._prevH||trimmerImg.height;
+  const origW=trimmerImg._origW||trimmerImg.width;
+  const origH=trimmerImg._origH||trimmerImg.height;
+  const scaleToOrig=origW/prevW;
+  const srcX=(bx-trimmerImgX)/trimmerImgW*prevW*scaleToOrig;
+  const srcY=(by-trimmerImgY)/trimmerImgH*prevH*scaleToOrig;
+  const srcSize=(trimmerBoxSize/trimmerImgW)*prevW*scaleToOrig;
+  const drawSrc=trimmerImg._orig||trimmerImg;
+  const OUT=3000;
+  const out=document.createElement('canvas');
+  out.width=OUT;out.height=OUT;
+  const ctx=out.getContext('2d');
+  // 角丸クリップ
+  const r=OUT*0.1;
+  ctx.beginPath();
+  ctx.moveTo(r,0);ctx.lineTo(OUT-r,0);ctx.arcTo(OUT,0,OUT,r,r);
+  ctx.lineTo(OUT,OUT-r);ctx.arcTo(OUT,OUT,OUT-r,OUT,r);
+  ctx.lineTo(r,OUT);ctx.arcTo(0,OUT,0,OUT-r,r);
+  ctx.lineTo(0,r);ctx.arcTo(0,0,r,0,r);
+  ctx.closePath();ctx.clip();
+  ctx.drawImage(drawSrc,srcX,srcY,srcSize,srcSize,0,0,OUT,OUT);
+  const result=out.toDataURL('image/png');
+  if(currentMemo){
+    currentMemo.coverImage=result;
+    dbPut('memos',currentMemo);
+    renderMemoDetail();
+  }
+  closeModal('modal-trimmer');
+  showToast('アイコンを設定しました');
+}
+
+// ===== XLSX OUTPUT =====
+async function exportXlsx(){
+  if(!currentGroupId){showToast('グループを開いてください');return;}
+  const[memos,formats,group]=await Promise.all([dbGetAll('memos'),dbGetAll('formats'),dbGet('groups',currentGroupId)]);
+  const groupMemos=memos.filter(m=>m.groupId===currentGroupId);
+  if(!groupMemos.length){showToast('メモがありません');return;}
+
+  // ヘッダー行を作成（全フォーマットの全フィールドをUnion）
+  const fmtMap={};for(const f of formats)fmtMap[f.id]=f;
+  // カラム: ID, キャラ名, タグ, 各フィールド
+  const colMap={}; // key -> colName
+  for(const m of groupMemos){
+    const fmt=fmtMap[m.formatId];
+    if(!fmt)continue;
+    for(const sec of fmt.sections){
+      for(const f of sec.fields){
+        if(f.type==='image')continue;
+        const key=`${sec.sectionId}_${f.fieldId}`;
+        if(!colMap[key])colMap[key]=f.name;
+      }
+    }
+  }
+  const keys=Object.keys(colMap);
+  const headers=['ID','キャラ名','タグ',...keys.map(k=>colMap[k])];
+
+  const rows=groupMemos.map(m=>{
+    const fmt=fmtMap[m.formatId];
+    const row=[m.id,m.title||'',(m.tags||[]).join('、')];
+    for(const key of keys){
+      if(!fmt){row.push('');continue;}
+      const sec=fmt.sections.find(s=>key.startsWith(s.sectionId+'_'));
+      const field=sec?sec.fields.find(f=>`${sec.sectionId}_${f.fieldId}`===key):null;
+      const val=m.fieldValues?.[key];
+      if(!field){row.push('');continue;}
+      if(field.type==='text'){
+        const t=typeof val==='string'?val:'';
+        row.push(field.template&&t.trim()===field.template.trim()?'':t);
+      }else if(field.type==='index'){
+        row.push(Array.isArray(val)?val.join('、'):'');
+      }else if(field.type==='list'){
+        const items=Array.isArray(val)?val:[];
+        row.push(items.filter(i=>i.name||i.text).map(i=>`[${i.name||''}]${i.text||''}`).join(' / '));
+      }else row.push('');
+    }
+    return row;
+  });
+
+  // CSV形式でxlsx相当（SheetJSなしでシンプルに）
+  const csvRows=[headers,...rows].map(row=>
+    row.map(cell=>{
+      const s=String(cell==null?'':cell).replace(/"/g,'""');
+      return s.includes(',')||s.includes('\n')||s.includes('"')?`"${s}"`:s;
+    }).join(',')
+  ).join('\n');
+
+  const bom='\uFEFF';
+  const blob=new Blob([bom+csvRows],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`${group.name}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSVを出力しました');
+}
+
+// ===== BACKUP =====
+function openBackupModal(){openModal('modal-backup');}
+async function exportData(){
+  const[groups,formats,memos]=await Promise.all([dbGetAll('groups'),dbGetAll('formats'),dbGetAll('memos')]);
+  const blob=new Blob([JSON.stringify({version:3,exportedAt:now(),groups,formats,memos},null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download=`charamemo_${new Date().toISOString().slice(0,10)}.json`;a.click();
+  URL.revokeObjectURL(url);showToast('エクスポートしました');
+}
+function triggerImport(mode){importMode=mode;document.getElementById('import-file').click();}
+async function handleImportFile(e){
+  const file=e.target.files[0];if(!file)return;e.target.value='';
+  try{
+    const data=JSON.parse(await file.text());
+    if(!data.groups||!data.formats||!data.memos)throw new Error('形式が違います');
+    const msg=importMode==='overwrite'?'全データを上書きします。現在のデータはすべて消えます。':'データを追加します。同じIDのデータは上書きされます。';
+    confirmDialog('インポート確認',msg,'インポート',async()=>{
+      if(importMode==='overwrite'){
+        for(const g of await dbGetAll('groups'))await dbDelete('groups',g.id);
+        for(const f of await dbGetAll('formats'))await dbDelete('formats',f.id);
+        for(const m of await dbGetAll('memos'))await dbDelete('memos',m.id);
+      }
+      for(const g of data.groups)await dbPut('groups',g);
+      for(const f of data.formats)await dbPut('formats',f);
+      for(const m of data.memos)await dbPut('memos',m);
+      closeModal('modal-backup');showToast('インポートしました');loadGroups();
+    });
+  }catch(err){showToast('インポートに失敗: '+err.message);}
+}
+
+// ===== INIT =====
+async function init(){
+  await openDB();
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='flex';
+  showScreen('screen-groups');await loadGroups();
+}
+init().catch(err=>{
+  document.getElementById('loading').innerHTML=`<div style="color:var(--danger);text-align:center;padding:20px"><div style="font-size:24px;margin-bottom:8px">⚠</div><div>起動に失敗しました</div><div style="font-size:12px;margin-top:8px;color:var(--text-2)">${err.message}</div></div>`;
+});
+</script>
+</body>
+</html>
