@@ -1177,6 +1177,10 @@ function renderFieldBody(field,val,key,isEdit){
         <div class="list-item-block">
           <div class="list-item-header">
             <input class="field-input" style="font-size:13px;padding:7px 10px" type="text" value="${esc(item.name||'')}" placeholder="名前（例：鈴木一郎）" oninput="onListItemChange('${key}',${i},'name',this.value)">
+            <div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">
+              ${i>0?`<button class="btn-icon" style="width:28px;height:28px;font-size:11px" onclick="moveListItem('${key}',${i},-1)">↑</button>`:'<div style="width:28px;height:28px"></div>'}
+              ${i<items.length-1?`<button class="btn-icon" style="width:28px;height:28px;font-size:11px" onclick="moveListItem('${key}',${i},1)">↓</button>`:'<div style="width:28px;height:28px"></div>'}
+            </div>
             <button class="btn-icon" style="width:30px;height:30px;font-size:13px;color:var(--danger);flex-shrink:0" onclick="removeListItem('${key}',${i})">✕</button>
           </div>
           <textarea class="field-textarea" style="min-height:60px;font-size:14px;margin-top:6px" placeholder="内容..." oninput="onListItemChange('${key}',${i},'text',this.value)">${esc(item.text||'')}</textarea>
@@ -1254,6 +1258,16 @@ function addListItem(key){
   updateEmptyUI(key);
   onMemoChange();renderMemoDetail();
   setTimeout(()=>{const inputs=document.querySelectorAll('.list-item-block input');if(inputs.length)inputs[inputs.length-1].focus();},100);
+}
+function moveListItem(key,idx,dir){
+  if(!currentMemo)return;
+  const items=[...(currentMemo.fieldValues[key]||[])];
+  const j=idx+dir;
+  if(j<0||j>=items.length)return;
+  [items[idx],items[j]]=[items[j],items[idx]];
+  currentMemo.fieldValues[key]=items;
+  onMemoChange();
+  renderMemoDetail();
 }
 function removeListItem(key,idx){
   if(!currentMemo)return;
@@ -2064,7 +2078,11 @@ function toggleOutputSetField(si,key){
   const set=pendingOutputSets[si];
   if(set.fieldKeys.includes(key))set.fieldKeys=set.fieldKeys.filter(k=>k!==key);
   else set.fieldKeys.push(key);
+  // スクロール位置を保存して復元
+  const modalBody=document.querySelector('#modal-format .modal-body');
+  const scrollTop=modalBody?modalBody.scrollTop:0;
   renderPendingOutputSets();
+  if(modalBody)setTimeout(()=>modalBody.scrollTop=scrollTop,0);
 }
 function toggleOutputSetOption(si,prop){
   pendingOutputSets[si][prop]=!pendingOutputSets[si][prop];
