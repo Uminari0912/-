@@ -7,33 +7,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CharaMemo">
 <title>CharaMemo</title>
-<!-- Firebase SDKs (compat version - no module needed) -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyBMWVJG3ilyAbzxM7ysJqFXjJvP0o3R33I",
-    authDomain: "chara-memo-fad9c.firebaseapp.com",
-    databaseURL: "https://chara-memo-fad9c-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "chara-memo-fad9c",
-    storageBucket: "chara-memo-fad9c.firebasestorage.app",
-    messagingSenderId: "964709448657",
-    appId: "1:964709448657:web:6172b8820d9ef991723ef0"
-  };
-  firebase.initializeApp(firebaseConfig);
-
-  window._firebaseDB = firebase.database();
-  window._firebaseAuth = firebase.auth();
-  window._fbRef = (db, path) => db.ref(path);
-  window._fbSet = (ref, val) => ref.set(val);
-  window._fbGet = (ref) => ref.once('value');
-  window._fbRemove = (ref) => ref.remove();
-  window._fbSignIn = (auth, email, pw) => auth.signInWithEmailAndPassword(email, pw);
-  window._fbSignOut = (auth) => auth.signOut();
-  window._fbOnAuthStateChanged = (auth, cb) => auth.onAuthStateChanged(cb);
-  window._fbCreateUser = (auth, email, pw) => auth.createUserWithEmailAndPassword(email, pw);
-</script>
 <style>
 :root {
   --bg-0:#0a0a0f;--bg-1:#111118;--bg-2:#1a1a24;--bg-3:#22222f;--bg-4:#2a2a3a;
@@ -273,25 +246,6 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);cursor:
 <body>
 
 <div id="loading" class="loading"><div class="spinner"></div><span>読み込み中...</span></div>
-
-<!-- ログイン画面 -->
-<div id="login-screen" style="display:none;height:100dvh;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px;background:var(--bg-0)">
-  <div style="font-size:28px;font-weight:700;color:var(--accent);margin-bottom:8px;letter-spacing:0.05em">CHARA</div>
-  <div style="font-size:13px;color:var(--text-2);margin-bottom:40px">キャラクター設定データベース</div>
-  <div style="width:100%;max-width:340px">
-    <div class="field-group">
-      <label class="field-label">メールアドレス</label>
-      <input class="field-input" type="email" id="login-email" placeholder="example@gmail.com" autocomplete="email">
-    </div>
-    <div class="field-group">
-      <label class="field-label">パスワード</label>
-      <input class="field-input" type="password" id="login-password" placeholder="パスワード" autocomplete="current-password">
-    </div>
-    <div id="login-error" style="color:var(--danger);font-size:13px;margin-bottom:12px;display:none"></div>
-    <button class="btn btn-primary btn-full" onclick="doLogin()" style="margin-bottom:0">ログイン</button>
-  </div>
-</div>
-
 <div id="app" style="display:none">
 
 <!-- GROUP LIST -->
@@ -299,10 +253,8 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);cursor:
   <div class="header">
     <span class="header-logo">CHARA</span>
     <span class="header-title">グループ一覧</span>
-    <span id="role-badge" style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--accent-glow);color:var(--accent);border:1px solid rgba(124,106,245,0.3);flex-shrink:0"></span>
-    <button class="btn-icon" id="btn-backup" onclick="openBackupModal()">⬡</button>
-    <button class="btn-icon" id="btn-formats" onclick="showScreen('screen-formats')">⊞</button>
-    <button class="btn-icon" onclick="doLogout()" title="ログアウト" style="font-size:14px">⏻</button>
+    <button class="btn-icon" onclick="openBackupModal()">⬡</button>
+    <button class="btn-icon" onclick="showScreen('screen-formats')">⊞</button>
   </div>
   <div class="scroll-area" id="group-list"></div>
   <div class="bottom-bar"><button class="btn btn-primary btn-full" onclick="openGroupModal()">＋ グループを作成</button></div>
@@ -462,7 +414,6 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);cursor:
       <div id="field-list-opts" style="display:none"><p style="color:var(--text-2);font-size:13px;line-height:1.6">メモ編集時に小項目を自由に追加できます（最大100個）。<br>各小項目は名前＋テキストの形式です。</p></div>
       <div class="divider"></div>
       <div class="check-row"><input type="checkbox" id="field-export-input" checked><label for="field-export-input">出力対象にする</label></div>
-      <div class="check-row"><input type="checkbox" id="field-viewer-input" checked><label for="field-viewer-input">閲覧者に表示する</label></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary flex-1" onclick="closeModal('modal-field-edit')">キャンセル</button>
@@ -620,7 +571,6 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);cursor:
 const DB_NAME='CharaMemoDB2';
 let db;
 function openDB(){
-  return Promise.resolve(); // Firebase使用のためIndexedDB不要
   return new Promise((res,rej)=>{
     const req=indexedDB.open(DB_NAME,1);
     req.onupgradeneeded=e=>{
@@ -632,10 +582,10 @@ function openDB(){
   });
 }
 const txs=(s,m='readonly')=>db.transaction(s,m).objectStore(s);
-const fbGetAll=s=>new Promise((r,j)=>{const q=txs(s).getAll();q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
-const fbGet=(s,k)=>new Promise((r,j)=>{const q=txs(s).get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
-const fbPut=(s,v)=>new Promise((r,j)=>{const q=txs(s,'readwrite').put(v);q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
-const fbDelete=(s,k)=>new Promise((r,j)=>{const q=txs(s,'readwrite').delete(k);q.onsuccess=()=>r();q.onerror=()=>j(q.error);});
+const dbGetAll=s=>new Promise((r,j)=>{const q=txs(s).getAll();q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
+const dbGet=(s,k)=>new Promise((r,j)=>{const q=txs(s).get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
+const dbPut=(s,v)=>new Promise((r,j)=>{const q=txs(s,'readwrite').put(v);q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
+const dbDelete=(s,k)=>new Promise((r,j)=>{const q=txs(s,'readwrite').delete(k);q.onsuccess=()=>r();q.onerror=()=>j(q.error);});
 
 // ===== STATE =====
 let currentGroupId=null,currentMemoId=null,currentMode='view';
@@ -733,7 +683,7 @@ function undoMemo(){
   currentMemo.fieldValues=JSON.parse(JSON.stringify(state.fieldValues));
   currentMemo.title=state.title;
   currentMemo.updatedAt=now();
-  fbPut('memos',currentMemo);
+  dbPut('memos',currentMemo);
   updateUndoRedoUI();
   renderMemoDetail();
   showToast('元に戻しました');
@@ -748,7 +698,7 @@ function redoMemo(){
   currentMemo.fieldValues=JSON.parse(JSON.stringify(state.fieldValues));
   currentMemo.title=state.title;
   currentMemo.updatedAt=now();
-  fbPut('memos',currentMemo);
+  dbPut('memos',currentMemo);
   updateUndoRedoUI();
   renderMemoDetail();
   showToast('やり直しました');
@@ -835,13 +785,7 @@ function applyFormatCollapseState(){
 
 // ===== GROUPS =====
 async function loadGroups(){
-  const roleBadge=document.getElementById('role-badge');
-  if(roleBadge)roleBadge.textContent=isAdmin?'管理者':'閲覧者';
-  const btnBackup=document.getElementById('btn-backup');
-  const btnFormats=document.getElementById('btn-formats');
-  if(btnBackup)btnBackup.style.display=isAdmin?'flex':'none';
-  if(btnFormats)btnFormats.style.display=isAdmin?'flex':'none';
-  const[groups,memos]=await Promise.all([fbGetAll('groups'),fbGetAll('memos')]);
+  const[groups,memos]=await Promise.all([dbGetAll('groups'),dbGetAll('memos')]);
   const el=document.getElementById('group-list');
   if(!groups.length){el.innerHTML=`<div class="empty"><div class="empty-icon">📁</div><div class="empty-text">グループがありません<br>下のボタンから作成してください</div></div>`;return;}
   groups.sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
@@ -862,30 +806,30 @@ function openGroupModal(id=null){
   const inp=document.getElementById('group-name-input');
   document.getElementById('modal-group-title').textContent=id?'グループを編集':'グループを作成';
   inp.value='';delete inp.dataset.editId;
-  if(id){fbGet('groups',id).then(g=>{inp.value=g.name;});inp.dataset.editId=id;}
+  if(id){dbGet('groups',id).then(g=>{inp.value=g.name;});inp.dataset.editId=id;}
   openModal('modal-group');setTimeout(()=>inp.focus(),300);
 }
 async function saveGroup(){
   const inp=document.getElementById('group-name-input');const name=inp.value.trim();
   if(!name){showToast('グループ名を入力してください');return;}
   const editId=inp.dataset.editId;
-  if(editId){const g=await fbGet('groups',editId);await fbPut('groups',{...g,name,updatedAt:now()});}
-  else await fbPut('groups',{id:uuid(),name,createdAt:now(),updatedAt:now()});
+  if(editId){const g=await dbGet('groups',editId);await dbPut('groups',{...g,name,updatedAt:now()});}
+  else await dbPut('groups',{id:uuid(),name,createdAt:now(),updatedAt:now()});
   closeModal('modal-group');loadGroups();
 }
 async function deleteGroup(id){
-  const g=await fbGet('groups',id);
+  const g=await dbGet('groups',id);
   confirmDialog('グループを削除',`「${g.name}」とその中のメモをすべて削除します。`,'削除',async()=>{
-    const memos=await fbGetAll('memos');
-    for(const m of memos.filter(m=>m.groupId===id))await fbDelete('memos',m.id);
-    await fbDelete('groups',id);loadGroups();
+    const memos=await dbGetAll('memos');
+    for(const m of memos.filter(m=>m.groupId===id))await dbDelete('memos',m.id);
+    await dbDelete('groups',id);loadGroups();
   });
 }
 
 // ===== MEMO LIST =====
 async function openGroup(groupId){
   currentGroupId=groupId;currentMode='view';
-  const g=await fbGet('groups',groupId);
+  const g=await dbGet('groups',groupId);
   document.getElementById('memo-list-title').textContent=g.name;
   document.getElementById('tag-screen-title').textContent=g.name+' のタグ';
   updateModeUI();showScreen('screen-memos');await loadMemos();
@@ -893,7 +837,7 @@ async function openGroup(groupId){
 let allFormatsMap={}; // formatId -> format
 
 async function loadMemos(){
-  const [memos,formats]=await Promise.all([fbGetAll('memos'),fbGetAll('formats')]);
+  const [memos,formats]=await Promise.all([dbGetAll('memos'),dbGetAll('formats')]);
   allFormatsMap={};
   for(const f of formats)allFormatsMap[f.id]=f;
   allMemos=memos.filter(m=>m.groupId===currentGroupId).sort((a,b)=>(a.sortOrder??9999)-(b.sortOrder??9999)||(a.createdAt.localeCompare(b.createdAt)));
@@ -954,17 +898,11 @@ function filterMemos(){
   if(!q){renderMemoList(allMemos);return;}
   renderMemoList(allMemos.filter(m=>(m.title||'').toLowerCase().includes(q)||m.id.toLowerCase().includes(q)||(m.tags||[]).some(t=>t.toLowerCase().includes(q))));
 }
-function setMode(mode){
-  if(mode==='edit'&&!isAdmin){showToast('編集権限がありません');return;}
-  currentMode=mode;updateModeUI();renderMemoList(allMemos);
-}
+function setMode(mode){currentMode=mode;updateModeUI();renderMemoList(allMemos);}
 function updateModeUI(){
   document.getElementById('mode-btn-view').classList.toggle('active',currentMode==='view');
   document.getElementById('mode-btn-edit').classList.toggle('active',currentMode==='edit');
-  document.getElementById('memo-add-bar').style.display=currentMode==='edit'&&isAdmin?'flex':'none';
-  // 閲覧者は編集ボタンを非表示
-  const editBtn=document.getElementById('mode-btn-edit');
-  if(editBtn)editBtn.style.display=isAdmin?'':'none';
+  document.getElementById('memo-add-bar').style.display=currentMode==='edit'?'flex':'none';
 }
 
 // ===== DRAG SORT =====
@@ -990,14 +928,14 @@ async function onDrop(e,toIdx){
   const moved=allMemos.splice(dragSrcIdx,1)[0];
   allMemos.splice(toIdx,0,moved);
   allMemos.forEach((m,i)=>{m.sortOrder=i;});
-  await Promise.all(allMemos.map(m=>fbPut('memos',m)));
+  await Promise.all(allMemos.map(m=>dbPut('memos',m)));
   renderMemoList(allMemos);
 }
 
 // ===== DUPLICATE MEMO =====
 async function duplicateMemo(memoId){
-  const src=await fbGet('memos',memoId);
-  const all=await fbGetAll('memos');
+  const src=await dbGet('memos',memoId);
+  const all=await dbGetAll('memos');
   if(all.filter(m=>m.groupId===currentGroupId).length>=100){showToast('グループが満杯です（最大100）');return;}
   const nums=all.map(m=>{const match=m.id.match(/^chara_(\d+)$/);return match?parseInt(match[1]):0;});
   const newId='chara_'+String(Math.max(0,...nums)+1).padStart(3,'0');
@@ -1012,16 +950,16 @@ async function duplicateMemo(memoId){
     sortOrder:(src.sortOrder??0)+0.5,
     createdAt:now(),updatedAt:now()
   };
-  await fbPut('memos',copy);
+  await dbPut('memos',copy);
   await loadMemos();
   showToast('複製しました');
 }
 
 // ===== NEW MEMO =====
 async function openNewMemoModal(){
-  const memos=await fbGetAll('memos');
+  const memos=await dbGetAll('memos');
   if(memos.filter(m=>m.groupId===currentGroupId).length>=100){showToast('このグループは満杯です（最大100）');return;}
-  const formats=await fbGetAll('formats');
+  const formats=await dbGetAll('formats');
   if(!formats.length){showToast('先にフォーマットを作成してください');showScreen('screen-formats');return;}
   document.getElementById('new-memo-format').innerHTML=formats.map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join('');
   document.getElementById('new-memo-title').value='';document.getElementById('new-memo-id').value='';
@@ -1035,22 +973,22 @@ async function createMemo(){
   let memoId=rawId;
   if(memoId){
     if(!/^[a-zA-Z0-9_-]+$/.test(memoId)){showToast('IDは英数字・_・-のみ');return;}
-    if(await fbGet('memos',memoId)){showToast('そのIDは既に使われています');return;}
+    if(await dbGet('memos',memoId)){showToast('そのIDは既に使われています');return;}
   }else{
-    const all=await fbGetAll('memos');
+    const all=await dbGetAll('memos');
     const nums=all.map(m=>{const match=m.id.match(/^chara_(\d+)$/);return match?parseInt(match[1]):0;});
     memoId='chara_'+String(Math.max(0,...nums)+1).padStart(3,'0');
   }
-  const format=await fbGet('formats',formatId);
+  const format=await dbGet('formats',formatId);
   const fieldValues={};
   for(const sec of format.sections)for(const f of sec.fields){
     const key=`${sec.sectionId}_${f.fieldId}`;
     fieldValues[key]=f.type==='text'?(f.template||''):[];
   }
-  const allM=await fbGetAll('memos');
+  const allM=await dbGetAll('memos');
   const groupMemos=allM.filter(m=>m.groupId===currentGroupId);
   const maxOrder=groupMemos.reduce((mx,m)=>Math.max(mx,m.sortOrder??0),0);
-  await fbPut('memos',{id:memoId,title,groupId:currentGroupId,formatId,tags:[],linkedMemos:[],coverImage:null,fieldValues,history:[],sortOrder:maxOrder+1,createdAt:now(),updatedAt:now()});
+  await dbPut('memos',{id:memoId,title,groupId:currentGroupId,formatId,tags:[],linkedMemos:[],coverImage:null,fieldValues,history:[],sortOrder:maxOrder+1,createdAt:now(),updatedAt:now()});
   closeModal('modal-new-memo');await loadMemos();openMemo(memoId);
 }
 
@@ -1058,9 +996,9 @@ async function createMemo(){
 async function openMemo(memoId){
   try{
     const prevMemoId=currentMemoId;
-    currentMemo=await fbGet('memos',memoId);
+    currentMemo=await dbGet('memos',memoId);
     if(!currentMemo){showToast('メモが見つかりません');return;}
-    currentFormat=await fbGet('formats',currentMemo.formatId);
+    currentFormat=await dbGet('formats',currentMemo.formatId);
     if(!currentMemo.linkedMemos)currentMemo.linkedMemos=[];
     if(!currentMemo.history)currentMemo.history=[];
     if(!currentMemo.coverImage)currentMemo.coverImage=null;
@@ -1145,8 +1083,6 @@ function renderMemoDetail(){
     const emptyBadge=isEdit&&emptyCount>0?`<span class="empty-count-badge">未入力 ${emptyCount}</span>`:'';
     html+=`<div class="section-block"><div class="section-label" id="lbl_${sid}" onclick="toggleSection('${sid}')"><span class="section-label-arrow">▸</span>${esc(sec.name)}<span class="empty-count-badge" id="badge_${sid}" style="${isEdit&&emptyCount>0?'':'display:none'}">未入力 ${emptyCount}</span></div><div class="section-fields" id="fld_${sid}">`;
     for(const field of [...sec.fields].sort((a,b)=>a.order-b.order)){
-      // 閲覧者には非表示項目をスキップ
-      if(!isAdmin && field.viewerVisible===false) continue;
       const key=`${sec.sectionId}_${field.fieldId}`;
       const val=m.fieldValues[key];
       const expBadge=field.exportable&&field.type!=='image'?`<span class="badge badge-export" style="font-size:9px;padding:1px 5px">出力</span>`:'';
@@ -1379,7 +1315,7 @@ async function saveMemoNow(){
   // Keep only last 100 history entries
   currentMemo.history=historyEntries.slice(0,100);
   currentMemo.updatedAt=now();
-  await fbPut('memos',currentMemo);
+  await dbPut('memos',currentMemo);
   snapshotFields();
   updateAutosave('saved');
   const idx=allMemos.findIndex(m=>m.id===currentMemo.id);
@@ -1544,7 +1480,7 @@ function openCopyToModal(){
   openModal('modal-copy-to');
 }
 async function copyToMemo(targetId){
-  const target=await fbGet('memos',targetId);
+  const target=await dbGet('memos',targetId);
   confirmDialog(
     'コピーして上書き',
     `「${currentMemo.title||currentMemo.id}」の内容を「${target.title||target.id}」に上書きします。よろしいですか？`,
@@ -1558,7 +1494,7 @@ async function copyToMemo(targetId){
         copiedUneditedKeys:Object.keys(currentMemo.fieldValues||{}),
         updatedAt:now()
       };
-      await fbPut('memos',copied);
+      await dbPut('memos',copied);
       closeModal('modal-copy-to');
       showToast(`「${target.title||target.id}」にコピーしました`);
     }
@@ -1608,7 +1544,7 @@ function openHistoryModal(){
 
 // ===== TAG LIST SCREEN =====
 async function loadTagList(){
-  const memos=await fbGetAll('memos');
+  const memos=await dbGetAll('memos');
   const groupMemos=memos.filter(m=>m.groupId===currentGroupId);
   const tagMap={};
   for(const m of groupMemos){
@@ -1634,9 +1570,9 @@ function filterByTag(tag){
 
 // ===== DELETE MEMO =====
 async function deleteMemo(memoId){
-  const m=await fbGet('memos',memoId);
+  const m=await dbGet('memos',memoId);
   confirmDialog('メモを削除',`「${m.title||m.id}」を完全に削除します。`,'削除',async()=>{
-    await fbDelete('memos',memoId);
+    await dbDelete('memos',memoId);
     if(currentMemoId===memoId){showScreen('screen-memos');currentMemoId=null;currentMemo=null;}
     loadMemos();
   });
@@ -1644,21 +1580,21 @@ async function deleteMemo(memoId){
 
 // ===== FORMAT CHANGE =====
 async function openFormatChangeModal(){
-  const formats=await fbGetAll('formats');
+  const formats=await dbGetAll('formats');
   document.getElementById('format-change-select').innerHTML=formats.map(f=>`<option value="${f.id}" ${f.id===currentMemo.formatId?'selected':''}>${esc(f.name)}</option>`).join('');
   openModal('modal-format-change');
 }
 async function applyFormatChange(){
   const newFmtId=document.getElementById('format-change-select').value;
   if(newFmtId===currentMemo.formatId){closeModal('modal-format-change');return;}
-  const newFmt=await fbGet('formats',newFmtId);
+  const newFmt=await dbGet('formats',newFmtId);
   const oldVals={...currentMemo.fieldValues},newVals={};
   for(const sec of newFmt.sections)for(const f of sec.fields){
     const key=`${sec.sectionId}_${f.fieldId}`;
     newVals[key]=oldVals[key]!==undefined?oldVals[key]:(f.type==='text'?(f.template||''):[]);
   }
   currentMemo.formatId=newFmtId;currentMemo.fieldValues=newVals;currentFormat=newFmt;
-  await fbPut('memos',currentMemo);closeModal('modal-format-change');renderMemoDetail();
+  await dbPut('memos',currentMemo);closeModal('modal-format-change');renderMemoDetail();
 }
 
 // ===== OUTPUT =====
@@ -1890,7 +1826,7 @@ async function copyOutput(){
 
 // ===== FORMATS =====
 async function loadFormats(){
-  const formats=await fbGetAll('formats');const el=document.getElementById('format-list');
+  const formats=await dbGetAll('formats');const el=document.getElementById('format-list');
   if(!formats.length){el.innerHTML=`<div class="empty"><div class="empty-icon">⊞</div><div class="empty-text">フォーマットがありません<br>下のボタンから作成してください</div></div>`;return;}
   el.innerHTML=formats.map(f=>{
     const sc=f.sections.length,fc=f.sections.reduce((s,sec)=>s+sec.fields.length,0);
@@ -1904,9 +1840,9 @@ async function loadFormats(){
 }
 
 async function duplicateFormat(id){
-  const src=await fbGet('formats',id);
+  const src=await dbGet('formats',id);
   const copy={...src,id:uuid(),name:src.name+'_コピー',sections:JSON.parse(JSON.stringify(src.sections)),createdAt:now(),updatedAt:now()};
-  await fbPut('formats',copy);loadFormats();showToast('フォーマットを複製しました');
+  await dbPut('formats',copy);loadFormats();showToast('フォーマットを複製しました');
 }
 
 function openFormatCreateModal(){
@@ -1916,7 +1852,7 @@ function openFormatCreateModal(){
   renderPendingSections();renderPendingOutputSets();openModal('modal-format');setTimeout(()=>document.getElementById('format-name-input').focus(),300);
 }
 async function openFormatEditModal(id){
-  editingFormatId=id;const fmt=await fbGet('formats',id);
+  editingFormatId=id;const fmt=await dbGet('formats',id);
   document.getElementById('modal-format-title').textContent='フォーマットを編集';
   document.getElementById('format-name-input').value=fmt.name;
   pendingSections=fmt.sections.map(s=>({...s,fields:s.fields.map(f=>({...f,indexOptions:[...(f.indexOptions||[])]})) }));
@@ -1979,8 +1915,6 @@ function editChildField(si,fi){
   document.getElementById('field-template-input').value=f.template||'';
   document.getElementById('field-export-input').checked=f.exportable!==false;
   document.getElementById('field-multi-input').checked=f.multiSelect||false;
-  const viewerEl=document.getElementById('field-viewer-input');
-  if(viewerEl)viewerEl.checked=f.viewerVisible!==false;
   renderFieldOptions(f.indexOptions||[]);onFieldTypeChange();openModal('modal-field-edit');
 }
 function moveChildField(si,fi,dir){const fields=pendingSections[si].fields,j=fi+dir;if(j<0||j>=fields.length)return;[fields[fi],fields[j]]=[fields[j],fields[fi]];fields.forEach((f,i)=>f.order=i);renderPendingSections();}
@@ -2012,10 +1946,9 @@ function saveFieldEdit(){
   const template=document.getElementById('field-template-input').value;
   const exportable=document.getElementById('field-export-input').checked;
   const multiSelect=document.getElementById('field-multi-input').checked;
-  const viewerVisible=document.getElementById('field-viewer-input')?.checked!==false;
   const indexOptions=type==='index'?getFieldOptions():[];
   if(type==='index'&&!indexOptions.length){showToast('選択肢を1つ以上追加してください');return;}
-  const fieldData={name,type,exportable,template,indexOptions,multiSelect,viewerVisible};
+  const fieldData={name,type,exportable,template,indexOptions,multiSelect};
   const fields=pendingSections[editingSectionIdx].fields;
   if(editingFieldIdx!==null){fields[editingFieldIdx]={...fields[editingFieldIdx],...fieldData};}
   else{const maxId=fields.reduce((m,f)=>Math.max(m,f.fieldId||0),0);fields.push({fieldId:maxId+1,order:fields.length,...fieldData});}
@@ -2025,42 +1958,42 @@ async function saveFormat(){
   const name=document.getElementById('format-name-input').value.trim();if(!name){showToast('フォーマット名を入力してください');return;}
   const sections=pendingSections.map((s,i)=>({...s,order:i,fields:s.fields.map((f,j)=>({...f,order:j}))}));
   if(editingFormatId){
-    const fmt=await fbGet('formats',editingFormatId);fmt.name=name;fmt.sections=sections;fmt.outputSets=pendingOutputSets;fmt.updatedAt=now();
-    await fbPut('formats',fmt);
-    const memos=await fbGetAll('memos');
+    const fmt=await dbGet('formats',editingFormatId);fmt.name=name;fmt.sections=sections;fmt.outputSets=pendingOutputSets;fmt.updatedAt=now();
+    await dbPut('formats',fmt);
+    const memos=await dbGetAll('memos');
     for(const memo of memos.filter(m=>m.formatId===editingFormatId)){
       const newVals={};
       for(const sec of sections)for(const f of sec.fields){
         const key=`${sec.sectionId}_${f.fieldId}`;
         newVals[key]=memo.fieldValues[key]!==undefined?memo.fieldValues[key]:(f.type==='text'?(f.template||''):[]);
       }
-      memo.fieldValues=newVals;memo.updatedAt=now();await fbPut('memos',memo);
+      memo.fieldValues=newVals;memo.updatedAt=now();await dbPut('memos',memo);
     }
   }else{
-    await fbPut('formats',{id:uuid(),name,sections,outputSets:pendingOutputSets,createdAt:now(),updatedAt:now()});
+    await dbPut('formats',{id:uuid(),name,sections,outputSets:pendingOutputSets,createdAt:now(),updatedAt:now()});
   }
   closeModal('modal-format');loadFormats();showToast('保存しました');
 }
 async function deleteFormat(id){
-  const fmt=await fbGet('formats',id),memos=await fbGetAll('memos');
+  const fmt=await dbGet('formats',id),memos=await dbGetAll('memos');
   const used=memos.filter(m=>m.formatId===id).length;
   const warnMsg=`「${fmt.name}」を削除します。`+(used?`\n※${used}件のメモで使用中です。`:'');
-  confirmDialog('フォーマットを削除',warnMsg,'削除',async()=>{await fbDelete('formats',id);loadFormats();});
+  confirmDialog('フォーマットを削除',warnMsg,'削除',async()=>{await dbDelete('formats',id);loadFormats();});
 }
 
 
 // ===== MEMO LOCK =====
 async function toggleMemoLock(memoId){
-  const m=await fbGet('memos',memoId);
+  const m=await dbGet('memos',memoId);
   if(m.locked){
     confirmDialog('ロック解除','このメモのロックを解除しますか？','解除',async()=>{
-      m.locked=false;await fbPut('memos',m);
+      m.locked=false;await dbPut('memos',m);
       if(currentMemoId===memoId){currentMemo.locked=false;renderMemoDetail();}
       loadMemos();showToast('ロック解除しました');
     });
   }else{
     confirmDialog('メモをロック','ロックすると編集できなくなります。','ロック',async()=>{
-      m.locked=true;await fbPut('memos',m);
+      m.locked=true;await dbPut('memos',m);
       if(currentMemoId===memoId){currentMemo.locked=true;renderMemoDetail();}
       loadMemos();showToast('ロックしました');
     });
@@ -2381,7 +2314,7 @@ function applyTrimmer(){
   const result=out.toDataURL('image/png');
   if(currentMemo){
     currentMemo.coverImage=result;
-    fbPut('memos',currentMemo);
+    dbPut('memos',currentMemo);
     renderMemoDetail();
   }
   closeModal('modal-trimmer');
@@ -2391,7 +2324,7 @@ function applyTrimmer(){
 // ===== XLSX OUTPUT =====
 async function exportXlsx(){
   if(!currentGroupId){showToast('グループを開いてください');return;}
-  const[memos,formats,group]=await Promise.all([fbGetAll('memos'),fbGetAll('formats'),fbGet('groups',currentGroupId)]);
+  const[memos,formats,group]=await Promise.all([dbGetAll('memos'),dbGetAll('formats'),dbGet('groups',currentGroupId)]);
   const groupMemos=memos.filter(m=>m.groupId===currentGroupId);
   if(!groupMemos.length){showToast('メモがありません');return;}
 
@@ -2457,7 +2390,7 @@ async function exportXlsx(){
 // ===== BACKUP =====
 function openBackupModal(){openModal('modal-backup');}
 async function exportData(){
-  const[groups,formats,memos]=await Promise.all([fbGetAll('groups'),fbGetAll('formats'),fbGetAll('memos')]);
+  const[groups,formats,memos]=await Promise.all([dbGetAll('groups'),dbGetAll('formats'),dbGetAll('memos')]);
   const blob=new Blob([JSON.stringify({version:3,exportedAt:now(),groups,formats,memos},null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');
   a.href=url;a.download=`charamemo_${new Date().toISOString().slice(0,10)}.json`;a.click();
@@ -2472,90 +2405,25 @@ async function handleImportFile(e){
     const msg=importMode==='overwrite'?'全データを上書きします。現在のデータはすべて消えます。':'データを追加します。同じIDのデータは上書きされます。';
     confirmDialog('インポート確認',msg,'インポート',async()=>{
       if(importMode==='overwrite'){
-        for(const g of await fbGetAll('groups'))await fbDelete('groups',g.id);
-        for(const f of await fbGetAll('formats'))await fbDelete('formats',f.id);
-        for(const m of await fbGetAll('memos'))await fbDelete('memos',m.id);
+        for(const g of await dbGetAll('groups'))await dbDelete('groups',g.id);
+        for(const f of await dbGetAll('formats'))await dbDelete('formats',f.id);
+        for(const m of await dbGetAll('memos'))await dbDelete('memos',m.id);
       }
-      for(const g of data.groups)await fbPut('groups',g);
-      for(const f of data.formats)await fbPut('formats',f);
-      for(const m of data.memos)await fbPut('memos',m);
+      for(const g of data.groups)await dbPut('groups',g);
+      for(const f of data.formats)await dbPut('formats',f);
+      for(const m of data.memos)await dbPut('memos',m);
       closeModal('modal-backup');showToast('インポートしました');loadGroups();
     });
   }catch(err){showToast('インポートに失敗: '+err.message);}
 }
 
-
-// ===== FIREBASE CONFIG =====
-const ADMIN_EMAIL = 'ozawakaito2004@gmail.com'; // ← 管理者メールアドレスに変更してください
-let currentUser = null;
-let isAdmin = false;
-let fbListeners = [];
-
-// Firebase DB操作（IndexedDBの代わり）
-async function fbGetAll(store) {
-  const db = window._firebaseDB;
-  const snapshot = await window._fbGet(window._fbRef(db, store));
-  if (!snapshot.exists()) return [];
-  const val = snapshot.val();
-  return Object.values(val);
-}
-async function fbGet(store, key) {
-  const db = window._firebaseDB;
-  const snapshot = await window._fbGet(window._fbRef(db, `${store}/${key}`));
-  if (!snapshot.exists()) return undefined;
-  return snapshot.val();
-}
-async function fbPut(store, val) {
-  const db = window._firebaseDB;
-  await window._fbSet(window._fbRef(db, `${store}/${val.id}`), val);
-  return val.id;
-}
-async function fbDelete(store, key) {
-  const db = window._firebaseDB;
-  await window._fbRemove(window._fbRef(db, `${store}/${key}`));
-}
-
-// ===== AUTH =====
-async function doLogin() {
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-  const errEl = document.getElementById('login-error');
-  errEl.style.display = 'none';
-  try {
-    await window._fbSignIn(window._firebaseAuth, email, password);
-  } catch(e) {
-    errEl.textContent = 'メールアドレスまたはパスワードが正しくありません';
-    errEl.style.display = 'block';
-  }
-}
-
-function doLogout() {
-  window._fbSignOut(window._firebaseAuth);
-}
-
 // ===== INIT =====
 async function init(){
-  // Firebase準備完了を待つ
-  window._fbOnAuthStateChanged(window._firebaseAuth, async (user) => {
-    document.getElementById('loading').style.display='none';
-    if (user) {
-      currentUser = user;
-      isAdmin = (user.email === ADMIN_EMAIL);
-      document.getElementById('login-screen').style.display='none';
-      document.getElementById('app').style.display='flex';
-      // ログアウトボタンをヘッダーに追加
-      showScreen('screen-groups');
-      await loadGroups();
-    } else {
-      currentUser = null;
-      isAdmin = false;
-      document.getElementById('app').style.display='none';
-      document.getElementById('login-screen').style.display='flex';
-      document.getElementById('login-screen').style.flexDirection='column';
-    }
-  });
+  await openDB();
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='flex';
+  showScreen('screen-groups');await loadGroups();
 }
-
 init().catch(err=>{
   document.getElementById('loading').innerHTML=`<div style="color:var(--danger);text-align:center;padding:20px"><div style="font-size:24px;margin-bottom:8px">⚠</div><div>起動に失敗しました</div><div style="font-size:12px;margin-top:8px;color:var(--text-2)">${err.message}</div></div>`;
 });
