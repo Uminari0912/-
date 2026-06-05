@@ -2586,8 +2586,10 @@ async function init(){
         const snap = await window._fbGet(window._fbRef(window._firebaseDB, 'config/adminUID'));
         const adminUID = snap.exists() ? snap.val() : null;
         isAdmin = (user.uid === adminUID);
+        if(!isAdmin)showToast('UID不一致: '+user.uid.slice(0,8));
       } catch(e) {
         isAdmin = false;
+        showToast('admin取得エラー: '+e.message);
       }
       document.getElementById('login-screen').style.display='none';
       document.getElementById('app').style.display='flex';
