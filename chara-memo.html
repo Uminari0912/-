@@ -355,7 +355,7 @@ body.viewer-mode .image-thumb {
     <span class="autosave" id="autosave-indicator"><span class="autosave-dot"></span><span id="autosave-text">—</span></span>
     <button class="btn-icon" id="undo-btn" onclick="undoMemo()" title="元に戻す" style="opacity:0.3;font-size:16px">↩</button>
     <button class="btn-icon" id="redo-btn" onclick="redoMemo()" title="やり直す" style="opacity:0.3;font-size:16px">↪</button>
-    <button class="btn-icon" onclick="openHistoryModal()" title="変更履歴">📋</button>
+    <button class="btn-icon" id="btn-history" onclick="openHistoryModal()" title="変更履歴">📋</button>
     <button class="btn-icon" id="btn-output" onclick="openOutputModal()" title="出力">↗</button>
   </div>
   <div class="scroll-area" id="memo-detail-body"></div>
@@ -2549,6 +2549,9 @@ function applyRoleUI(){
   // 編集モードボタン
   const editBtn=document.getElementById('mode-btn-edit');
   if(editBtn)editBtn.style.display=isAdmin?'':'none';
+  // 履歴ボタン
+  const btnHistory=document.getElementById('btn-history');
+  if(btnHistory)btnHistory.style.display=isAdmin?'flex':'none';
   // 閲覧者は強制viewモード
   if(!isAdmin)currentMode='view';
 }
@@ -2581,7 +2584,7 @@ async function init(){
       // FirebaseからadminUIDを取得して判定
       try {
         const snap = await window._fbGet(window._fbRef(window._firebaseDB, 'config/adminUID'));
-        const adminUID = snap.exists ? snap.val() : (snap.exists() ? snap.val() : null);
+        const adminUID = snap.exists() ? snap.val() : null;
         isAdmin = (user.uid === adminUID);
       } catch(e) {
         isAdmin = false;
