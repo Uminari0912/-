@@ -213,10 +213,16 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);cursor:
 /* 閲覧者は画像の長押し保存を防ぐ */
 body.viewer-mode .image-view-thumb img,
 body.viewer-mode .image-thumb img,
-body.viewer-mode .memo-cover-img {
+body.viewer-mode .memo-cover-img,
+body.viewer-mode img {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+body.viewer-mode .image-view-thumb,
+body.viewer-mode .image-thumb {
   pointer-events: none;
 }
 
@@ -840,18 +846,7 @@ function applyFormatCollapseState(){
 
 // ===== GROUPS =====
 async function loadGroups(){
-  const roleBadge=document.getElementById('role-badge');
-  if(roleBadge)roleBadge.textContent=isAdmin?'管理者':'閲覧者';
-  const btnBackup=document.getElementById('btn-backup');
-  const btnFormats=document.getElementById('btn-formats');
-  if(btnBackup)btnBackup.style.display=isAdmin?'flex':'none';
-  if(btnFormats)btnFormats.style.display=isAdmin?'flex':'none';
-  // 閲覧者モードのbody classと出力ボタン制御
-  if(isAdmin){
-    document.body.classList.remove('viewer-mode');
-  }else{
-    document.body.classList.add('viewer-mode');
-  }
+  applyRoleUI();
   const[groups,memos]=await Promise.all([fbGetAll('groups'),fbGetAll('memos')]);
   const el=document.getElementById('group-list');
   if(!groups.length){el.innerHTML=`<div class="empty"><div class="empty-icon">📁</div><div class="empty-text">グループがありません<br>下のボタンから作成してください</div></div>`;return;}
@@ -1144,6 +1139,11 @@ function renderMemoDetail(){
   const sections=fmt?[...fmt.sections].sort((a,b)=>a.order-b.order):[];
   for(const sec of sections){
     const sid=`sec_${sec.sectionId}`;
+    // 閲覧者の場合、表示可能な項目が1つもなければ大項目ごとスキップ
+    if(!isAdmin){
+      const visibleFields=sec.fields.filter(f=>f.viewerVisible!==false);
+      if(!visibleFields.length)continue;
+    }
     // 編集モードのみ未入力カウント
     let emptyCount=0;
     if(isEdit){
@@ -1678,6 +1678,7 @@ let currentOutputTab='format';
 let customChecked={}; // key -> bool
 
 function openOutputModal(){
+  if(!isAdmin){showToast('出力権限がありません');return;}
   if(!currentMemo||!currentFormat)return;
   currentOutputTab='format';
   customChecked={};
@@ -2526,6 +2527,32 @@ async function fbDelete(store, key) {
   await window._fbRemove(window._fbRef(db, `${store}/${key}`));
 }
 
+// ===== ROLE UI =====
+function applyRoleUI(){
+  // body class
+  if(isAdmin){
+    document.body.classList.remove('viewer-mode');
+  }else{
+    document.body.classList.add('viewer-mode');
+  }
+  // 出力ボタン
+  const btnOutput=document.getElementById('btn-output');
+  if(btnOutput)btnOutput.style.display=isAdmin?'flex':'none';
+  // バックアップ・フォーマット管理
+  const btnBackup=document.getElementById('btn-backup');
+  const btnFormats=document.getElementById('btn-formats');
+  if(btnBackup)btnBackup.style.display=isAdmin?'flex':'none';
+  if(btnFormats)btnFormats.style.display=isAdmin?'flex':'none';
+  // ロールバッジ
+  const roleBadge=document.getElementById('role-badge');
+  if(roleBadge)roleBadge.textContent=isAdmin?'管理者':'閲覧者';
+  // 編集モードボタン
+  const editBtn=document.getElementById('mode-btn-edit');
+  if(editBtn)editBtn.style.display=isAdmin?'':'none';
+  // 閲覧者は強制viewモード
+  if(!isAdmin)currentMode='view';
+}
+
 // ===== AUTH =====
 async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
@@ -2561,9 +2588,7 @@ async function init(){
       }
       document.getElementById('login-screen').style.display='none';
       document.getElementById('app').style.display='flex';
-      // 出力ボタンの表示制御
-      const btnOutput=document.getElementById('btn-output');
-      if(btnOutput)btnOutput.style.display=isAdmin?'flex':'none';
+      applyRoleUI();
       showScreen('screen-groups');
       await loadGroups();
     } else {
