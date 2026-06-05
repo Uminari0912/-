@@ -632,10 +632,6 @@ function openDB(){
   });
 }
 const txs=(s,m='readonly')=>db.transaction(s,m).objectStore(s);
-const fbGetAll=s=>new Promise((r,j)=>{const q=txs(s).getAll();q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
-const fbGet=(s,k)=>new Promise((r,j)=>{const q=txs(s).get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
-const fbPut=(s,v)=>new Promise((r,j)=>{const q=txs(s,'readwrite').put(v);q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
-const fbDelete=(s,k)=>new Promise((r,j)=>{const q=txs(s,'readwrite').delete(k);q.onsuccess=()=>r();q.onerror=()=>j(q.error);});
 
 // ===== STATE =====
 let currentGroupId=null,currentMemoId=null,currentMode='view';
