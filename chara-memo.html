@@ -210,6 +210,15 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);cursor:
 .image-view-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
 .image-view-thumb{aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--border);cursor:pointer;}
 .image-view-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+/* 閲覧者は画像の長押し保存を防ぐ */
+body.viewer-mode .image-view-thumb img,
+body.viewer-mode .image-thumb img,
+body.viewer-mode .memo-cover-img {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  pointer-events: none;
+}
 
 /* LIST FIELD */
 .list-field-wrap{display:flex;flex-direction:column;}
@@ -341,7 +350,7 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);cursor:
     <button class="btn-icon" id="undo-btn" onclick="undoMemo()" title="元に戻す" style="opacity:0.3;font-size:16px">↩</button>
     <button class="btn-icon" id="redo-btn" onclick="redoMemo()" title="やり直す" style="opacity:0.3;font-size:16px">↪</button>
     <button class="btn-icon" onclick="openHistoryModal()" title="変更履歴">📋</button>
-    <button class="btn-icon" onclick="openOutputModal()" title="出力">↗</button>
+    <button class="btn-icon" id="btn-output" onclick="openOutputModal()" title="出力">↗</button>
   </div>
   <div class="scroll-area" id="memo-detail-body"></div>
 </div>
@@ -837,6 +846,12 @@ async function loadGroups(){
   const btnFormats=document.getElementById('btn-formats');
   if(btnBackup)btnBackup.style.display=isAdmin?'flex':'none';
   if(btnFormats)btnFormats.style.display=isAdmin?'flex':'none';
+  // 閲覧者モードのbody classと出力ボタン制御
+  if(isAdmin){
+    document.body.classList.remove('viewer-mode');
+  }else{
+    document.body.classList.add('viewer-mode');
+  }
   const[groups,memos]=await Promise.all([fbGetAll('groups'),fbGetAll('memos')]);
   const el=document.getElementById('group-list');
   if(!groups.length){el.innerHTML=`<div class="empty"><div class="empty-icon">📁</div><div class="empty-text">グループがありません<br>下のボタンから作成してください</div></div>`;return;}
@@ -2482,7 +2497,7 @@ async function handleImportFile(e){
 
 
 // ===== FIREBASE CONFIG =====
-const ADMIN_EMAIL = 'ozawakaito2004@gmail.com'; // ← 管理者メールアドレスに変更してください
+// 管理者判定はFirebaseのconfig/adminUIDで行う（HTMLにメアドを書かない）
 let currentUser = null;
 let isAdmin = false;
 let fbListeners = [];
@@ -2536,10 +2551,19 @@ async function init(){
     document.getElementById('loading').style.display='none';
     if (user) {
       currentUser = user;
-      isAdmin = (user.email === ADMIN_EMAIL);
+      // FirebaseからadminUIDを取得して判定
+      try {
+        const snap = await window._fbGet(window._fbRef(window._firebaseDB, 'config/adminUID'));
+        const adminUID = snap.exists ? snap.val() : (snap.exists() ? snap.val() : null);
+        isAdmin = (user.uid === adminUID);
+      } catch(e) {
+        isAdmin = false;
+      }
       document.getElementById('login-screen').style.display='none';
       document.getElementById('app').style.display='flex';
-      // ログアウトボタンをヘッダーに追加
+      // 出力ボタンの表示制御
+      const btnOutput=document.getElementById('btn-output');
+      if(btnOutput)btnOutput.style.display=isAdmin?'flex':'none';
       showScreen('screen-groups');
       await loadGroups();
     } else {
