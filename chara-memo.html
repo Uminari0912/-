@@ -163,12 +163,15 @@ html,body{height:100%;width:100%;background:var(--bg-0);color:var(--text-0);font
 
 /* OUTPUT */
 /* MAP */
-.map-grid{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;-webkit-overflow-scrolling:touch;max-height:calc(100dvh - 140px);}
-.map-cell{background:var(--bg-2);min-width:52px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:2px;padding:2px;transition:background 0.15s;}
+.map-scroll-area{overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-x pan-y;max-height:calc(100dvh - 220px);}
+.map-grid{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);}
+.map-zoom-wrap{transform-origin:top left;will-change:transform;}
+.map-cell{background:var(--bg-2);min-width:52px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:2px;padding:2px;position:relative;-webkit-tap-highlight-color:rgba(124,106,245,0.2);}
 .map-cell:active{background:var(--accent-glow);}
 .map-cell-emoji{font-size:22px;line-height:1;}
 .map-cell-text{font-size:9px;color:var(--text-1);text-align:center;word-break:break-all;max-width:48px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 .map-cell-empty .map-cell-emoji{opacity:0.15;}
+.map-cell-note-dot{position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:0.8;}
 
 .output-text{background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-all;max-height:50dvh;overflow-y:auto;}
 
@@ -648,6 +651,10 @@ body.viewer-mode .image-thumb {
         <input class="field-input" type="text" id="map-cell-text" placeholder="例：竜の山脈">
       </div>
       <div class="field-group">
+        <label class="field-label">説明・メモ</label>
+        <textarea class="field-textarea" id="map-cell-note" placeholder="この場所の説明を入力..." style="min-height:80px;font-size:13px"></textarea>
+      </div>
+      <div class="field-group">
         <label class="field-label">背景色</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <div class="map-color-btn" data-color="" onclick="setMapCellColor('')" style="width:32px;height:32px;border-radius:6px;background:var(--bg-2);border:2px solid var(--border);cursor:pointer" title="デフォルト"></div>
@@ -665,6 +672,20 @@ body.viewer-mode .image-thumb {
       <button class="btn btn-secondary flex-1" onclick="clearMapCell()">クリア</button>
       <button class="btn btn-secondary flex-1" onclick="closeModal('modal-map-cell')">キャンセル</button>
       <button class="btn btn-primary flex-1" onclick="saveMapCell()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAP VIEW MODAL -->
+<div class="modal-overlay" id="modal-map-view">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span id="map-view-title"></span><button class="btn-icon" onclick="closeModal('modal-map-view')">✕</button></div>
+    <div class="modal-body">
+      <p id="map-view-note" style="font-size:14px;line-height:1.7;color:var(--text-0);white-space:pre-wrap"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary btn-full" onclick="closeModal('modal-map-view')">閉じる</button>
     </div>
   </div>
 </div>
@@ -2639,22 +2660,22 @@ function renderMapView(fmt, memoData, isEdit){
   const cols=fmt.mapCols||20;
   const rows=fmt.mapRows||20;
   const cellSize=52;
-  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">`;
+  let html=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">`;
   if(isEdit){
-    html+=`<button class="btn btn-secondary btn-sm" onclick="toggleMapSelectMode()" id="map-select-btn">${mapSelectMode?'✅ 選択中':'☐ 選択モード'}</button>`;
+    html+=`<button class="btn btn-secondary btn-sm" onclick="toggleMapSelectMode()">${mapSelectMode?'✅ 選択中':'☐ 選択'}</button>`;
     if(mapSelectMode&&mapSelectedKeys.size>0){
-      html+=`<button class="btn btn-primary btn-sm" onclick="openMapMultiEdit()">選択した${mapSelectedKeys.size}マスを編集</button>`;
+      html+=`<button class="btn btn-primary btn-sm" onclick="openMapMultiEdit()">${mapSelectedKeys.size}マス編集</button>`;
       html+=`<button class="btn btn-secondary btn-sm" onclick="clearMapSelection()">解除</button>`;
     }
-    html+=`<button class="btn btn-secondary btn-sm" onclick="openMapSizeModal()">サイズ変更</button>`;
+    html+=`<button class="btn btn-secondary btn-sm" onclick="openMapSizeModal()">サイズ</button>`;
   }
-  html+=`<button class="btn btn-secondary btn-sm" onclick="changeMapZoom(0.2)">＋</button>`;
-  html+=`<button class="btn btn-secondary btn-sm" onclick="changeMapZoom(-0.2)">－</button>`;
-  html+=`<span style="font-size:11px;color:var(--text-2)">${Math.round(mapZoom*100)}%</span>`;
+  html+=`<button class="btn btn-secondary btn-sm" onclick="changeMapZoom(0.25)" style="width:36px">＋</button>`;
+  html+=`<button class="btn btn-secondary btn-sm" onclick="changeMapZoom(-0.25)" style="width:36px">－</button>`;
+  html+=`<span style="font-size:11px;color:var(--text-2)" id="map-zoom-label">${Math.round(mapZoom*100)}%</span>`;
   html+=`</div>`;
-  html+=`<div style="overflow:auto;-webkit-overflow-scrolling:touch;max-height:calc(100dvh - 220px)" id="map-scroll-area">`;
-  html+=`<div id="map-zoom-wrap" style="transform-origin:top left;transform:scale(${mapZoom});width:${cols*cellSize+cols}px">`;
-  html+=`<div class="map-grid" style="grid-template-columns:repeat(${cols},${cellSize}px);width:${cols*cellSize+cols}px">`;
+  html+=`<div class="map-scroll-area" id="map-scroll-area">`;
+  html+=`<div class="map-zoom-wrap" id="map-zoom-wrap" style="transform:scale(${mapZoom});width:${cols*(cellSize+1)}px;height:${rows*(cellSize+1)}px">`;
+  html+=`<div class="map-grid" style="grid-template-columns:repeat(${cols},${cellSize}px)">`;
   for(let r=0;r<rows;r++){
     for(let c=0;c<cols;c++){
       const key=`${r}_${c}`;
@@ -2663,13 +2684,18 @@ function renderMapView(fmt, memoData, isEdit){
       const isSelected=mapSelectedKeys.has(key);
       const bg=cell.color?`background:${cell.color}`:'';
       const selStyle=isSelected?'outline:2px solid var(--accent);outline-offset:-2px;':'';
+      const hasNote=!!(cell.note&&cell.note.trim());
       let clickAttr='';
       if(isEdit){
         clickAttr=mapSelectMode
           ?`onclick="toggleMapCellSelect('${key}')"`
           :`onclick="openMapCellEdit('${key}')"`;
+      } else {
+        // 閲覧モード：説明があればポップアップ
+        if(hasNote||!isEmpty) clickAttr=`onclick="viewMapCell('${key}')"`;
       }
       html+=`<div class="map-cell${isEmpty?' map-cell-empty':''}" style="${bg}${selStyle}" ${clickAttr}>
+        ${hasNote?'<div class="map-cell-note-dot"></div>':''}
         <div class="map-cell-emoji">${cell.emoji||'·'}</div>
         ${cell.text?`<div class="map-cell-text">${esc(cell.text)}</div>`:''}
       </div>`;
@@ -2679,12 +2705,31 @@ function renderMapView(fmt, memoData, isEdit){
   return html;
 }
 
+function viewMapCell(key){
+  const cell=(currentMemo.fieldValues?.map||{})[key]||{};
+  if(!cell.emoji&&!cell.text&&!cell.note)return;
+  const name=[cell.emoji,cell.text].filter(Boolean).join(' ')||'（名称未設定）';
+  const note=cell.note||'';
+  if(!note)return; // 説明なしは何もしない
+  // モーダル表示
+  document.getElementById('map-view-title').textContent=name;
+  document.getElementById('map-view-note').textContent=note;
+  openModal('modal-map-view');
+}
+
 function changeMapZoom(delta){
-  mapZoom=Math.max(0.3,Math.min(3,mapZoom+delta));
+  mapZoom=Math.max(0.3,Math.min(3,+(mapZoom+delta).toFixed(2)));
   const wrap=document.getElementById('map-zoom-wrap');
-  if(wrap)wrap.style.transform=`scale(${mapZoom})`;
-  const pct=document.querySelector('#map-render-area span');
-  if(pct)pct.textContent=Math.round(mapZoom*100)+'%';
+  const cols=currentFormat?.mapCols||20;
+  const rows=currentFormat?.mapRows||20;
+  const cellSize=52;
+  if(wrap){
+    wrap.style.transform=`scale(${mapZoom})`;
+    wrap.style.width=`${cols*(cellSize+1)}px`;
+    wrap.style.height=`${rows*(cellSize+1)}px`;
+  }
+  const lbl=document.getElementById('map-zoom-label');
+  if(lbl)lbl.textContent=Math.round(mapZoom*100)+'%';
 }
 
 function toggleMapSelectMode(){
@@ -2712,6 +2757,7 @@ function openMapCellEdit(key){
   editingMapCellColor=cell.color||'';
   document.getElementById('map-cell-emoji').value=cell.emoji||'';
   document.getElementById('map-cell-text').value=cell.text||'';
+  document.getElementById('map-cell-note').value=cell.note||'';
   updateMapColorUI();
   openModal('modal-map-cell');
   setTimeout(()=>document.getElementById('map-cell-emoji').focus(),300);
@@ -2723,6 +2769,7 @@ function openMapMultiEdit(){
   editingMapCellColor='';
   document.getElementById('map-cell-emoji').value='';
   document.getElementById('map-cell-text').value='';
+  document.getElementById('map-cell-note').value='';
   updateMapColorUI();
   openModal('modal-map-cell');
 }
@@ -2746,14 +2793,16 @@ function saveMapCell(){
   if(!currentMemo.fieldValues.map)currentMemo.fieldValues.map={};
   const emoji=document.getElementById('map-cell-emoji').value.trim();
   const text=document.getElementById('map-cell-text').value.trim();
+  const note=document.getElementById('map-cell-note').value.trim();
   const keys=mapSelectedKeys.size>0?[...mapSelectedKeys]:(editingMapKey?[editingMapKey]:[]);
   for(const key of keys){
-    if(emoji||text||editingMapCellColor){
+    if(emoji||text||editingMapCellColor||note){
       const existing=currentMemo.fieldValues.map[key]||{};
       currentMemo.fieldValues.map[key]={
         emoji:emoji||existing.emoji||'',
         text:text||existing.text||'',
-        color:editingMapCellColor||existing.color||''
+        color:editingMapCellColor||existing.color||'',
+        note:note||existing.note||''
       };
     }
   }
