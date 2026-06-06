@@ -650,6 +650,9 @@ const txs=(s,m='readonly')=>db.transaction(s,m).objectStore(s);
 
 // ===== STATE =====
 let currentGroupId=null,currentMemoId=null,currentMode='view';
+// メモリキャッシュ（Firebaseの代わりにメモリから読む）
+let _cache = {groups:{}, formats:{}, memos:{}};
+let _cacheLoaded = false;
 let pendingOutputSets=[]; // [{setId, name, fieldKeys:[]}]
 let editingOutputSetIdx=null;
 let outputSetCollapsed={};
@@ -1062,6 +1065,7 @@ async function createMemo(){
 
 // ===== MEMO DETAIL =====
 async function openMemo(memoId){
+  updateAutosave('読み込み中...');
   try{
     const prevMemoId=currentMemoId;
     currentMemo=await fbGet('memos',memoId);
@@ -1356,6 +1360,8 @@ function removeListItem(key,idx){
 
 async function saveMemoNow(){
   if(!currentMemo)return;
+  // キャッシュを即時更新
+  _cache.memos[currentMemo.id]=JSON.parse(JSON.stringify(currentMemo));
   const titleEl=document.getElementById('memo-title-field');
   const oldTitle=currentMemo.title;
   if(titleEl)currentMemo.title=titleEl.value.trim()||'（名称未設定）';
@@ -2503,28 +2509,40 @@ let currentUser = null;
 let isAdmin = false;
 let fbListeners = [];
 
-// Firebase DB操作（IndexedDBの代わり）
-async function fbGetAll(store) {
+// Firebase DB操作（キャッシュ付き）
+async function loadAllCache() {
   const db = window._firebaseDB;
-  const snapshot = await window._fbGet(window._fbRef(db, store));
-  if (!snapshot.exists()) return [];
-  const val = snapshot.val();
-  return Object.values(val);
+  const [gs, fs, ms] = await Promise.all([
+    window._fbGet(window._fbRef(db, 'groups')),
+    window._fbGet(window._fbRef(db, 'formats')),
+    window._fbGet(window._fbRef(db, 'memos'))
+  ]);
+  _cache.groups = gs.exists() ? gs.val() : {};
+  _cache.formats = fs.exists() ? fs.val() : {};
+  _cache.memos = ms.exists() ? ms.val() : {};
+  _cacheLoaded = true;
+}
+async function fbGetAll(store) {
+  if(!_cacheLoaded) await loadAllCache();
+  return Object.values(_cache[store]||{});
 }
 async function fbGet(store, key) {
-  const db = window._firebaseDB;
-  const snapshot = await window._fbGet(window._fbRef(db, `${store}/${key}`));
-  if (!snapshot.exists()) return undefined;
-  return snapshot.val();
+  if(!_cacheLoaded) await loadAllCache();
+  return _cache[store]?.[key];
 }
 async function fbPut(store, val) {
+  // キャッシュ更新
+  if(!_cache[store]) _cache[store]={};
+  _cache[store][val.id] = val;
+  // Firebaseに非同期書き込み（待たない）
   const db = window._firebaseDB;
-  await window._fbSet(window._fbRef(db, `${store}/${val.id}`), val);
+  window._fbSet(window._fbRef(db, `${store}/${val.id}`), val);
   return val.id;
 }
 async function fbDelete(store, key) {
+  if(_cache[store]) delete _cache[store][key];
   const db = window._firebaseDB;
-  await window._fbRemove(window._fbRef(db, `${store}/${key}`));
+  window._fbRemove(window._fbRef(db, `${store}/${key}`));
 }
 
 // ===== ROLE UI =====
@@ -2594,6 +2612,9 @@ async function init(){
       document.getElementById('login-screen').style.display='none';
       document.getElementById('app').style.display='flex';
       applyRoleUI();
+      // 全データを一括読み込み
+      showToast('データを読み込み中...');
+      await loadAllCache();
       showScreen('screen-groups');
       await loadGroups();
     } else {
