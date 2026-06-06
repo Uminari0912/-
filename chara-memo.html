@@ -1172,8 +1172,23 @@ async function openMemo(memoId){
 function renderMemoDetail(){
   const el=document.getElementById('memo-detail-body');
   try{
-  const m=currentMemo,fmt=currentFormat,isEdit=currentMode==='edit';
+  const m=currentMemo,fmt=currentFormat,isEdit=currentMode==='edit'&&!m.locked&&isAdmin;
   let html='';
+
+  // マップ型フォーマットの場合は別描画
+  if(fmt.type==='map'){
+    let mapHtml=`<div style="padding:12px">`;
+    if(isEdit){
+      mapHtml+=`<input class="field-input" style="font-size:20px;font-weight:700;margin-bottom:12px" value="${esc(m.title||'')}" placeholder="タイトル" oninput="currentMemo.title=this.value;onMemoChange()">`;
+    }else{
+      mapHtml+=`<div style="font-size:20px;font-weight:700;margin-bottom:12px;color:var(--text-0)">${esc(m.title||'（名称未設定）')}</div>`;
+    }
+    mapHtml+=`<div id="map-render-area">${renderMapView(fmt,m.fieldValues?.map||{},isEdit)}</div>`;
+    mapHtml+=`</div>`;
+    el.innerHTML=mapHtml;
+    updateUndoRedoUI();
+    return;
+  }
 
   // Cover image
   const isLocked=m.locked&&!isEdit;
