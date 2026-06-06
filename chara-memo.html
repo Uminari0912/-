@@ -1999,9 +1999,10 @@ async function loadFormats(){
   const formats=await fbGetAll('formats');const el=document.getElementById('format-list');
   if(!formats.length){el.innerHTML=`<div class="empty"><div class="empty-icon">⊞</div><div class="empty-text">フォーマットがありません<br>下のボタンから作成してください</div></div>`;return;}
   el.innerHTML=formats.map(f=>{
-    const sc=f.sections.length,fc=f.sections.reduce((s,sec)=>s+sec.fields.length,0);
+    const isMap=f.type==='map';
+    const sub=isMap?`🗺 マップ (${f.mapCols||20}×${f.mapRows||20})`:`大項目 ${(f.sections||[]).length}個 / 項目 ${(f.sections||[]).reduce((s,sec)=>s+(sec.fields||[]).length,0)}個`;
     return`<div class="card"><div style="display:flex;align-items:center;gap:8px">
-      <div style="flex:1;min-width:0"><div class="card-title">${esc(f.name)}</div><div class="card-sub">大項目 ${sc}個 / 項目 ${fc}個</div></div>
+      <div style="flex:1;min-width:0"><div class="card-title">${esc(f.name)}</div><div class="card-sub">${sub}</div></div>
       <button class="btn-icon" style="width:32px;height:32px;font-size:13px" onclick="duplicateFormat('${f.id}')" title="複製">⧉</button>
       <button class="btn-icon" style="width:32px;height:32px;font-size:13px" onclick="openFormatEditModal('${f.id}')">✏</button>
       <button class="btn-icon" style="width:32px;height:32px;font-size:13px;color:var(--danger)" onclick="deleteFormat('${f.id}')">✕</button>
