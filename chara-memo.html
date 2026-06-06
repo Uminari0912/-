@@ -162,6 +162,14 @@ html,body{height:100%;width:100%;background:var(--bg-0);color:var(--text-0);font
 .modal-footer{padding:10px 18px 0;display:flex;gap:10px;flex-shrink:0;}
 
 /* OUTPUT */
+/* MAP */
+.map-grid{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;-webkit-overflow-scrolling:touch;max-height:calc(100dvh - 140px);}
+.map-cell{background:var(--bg-2);min-width:52px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:2px;padding:2px;transition:background 0.15s;}
+.map-cell:active{background:var(--accent-glow);}
+.map-cell-emoji{font-size:22px;line-height:1;}
+.map-cell-text{font-size:9px;color:var(--text-1);text-align:center;word-break:break-all;max-width:48px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.map-cell-empty .map-cell-emoji{opacity:0.15;}
+
 .output-text{background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-all;max-height:50dvh;overflow-y:auto;}
 
 /* TOAST */
@@ -420,6 +428,23 @@ body.viewer-mode .image-thumb {
     <div class="modal-header"><span id="modal-format-title">フォーマットを作成</span><button class="btn-icon" onclick="closeModal('modal-format')">✕</button></div>
     <div class="modal-body">
       <div class="field-group"><label class="field-label">フォーマット名</label><input class="field-input" type="text" id="format-name-input" placeholder="例：キャラクター設定"></div>
+      <div class="field-group">
+        <label class="field-label">種類</label>
+        <div style="display:flex;gap:8px">
+          <div id="ftype-normal" onclick="setFormatType('normal')" style="flex:1;padding:10px;border-radius:var(--radius-sm);border:2px solid var(--accent);background:var(--accent-glow);cursor:pointer;text-align:center">
+            <div style="font-size:18px;margin-bottom:4px">📝</div>
+            <div style="font-size:12px;font-weight:600;color:var(--accent)">通常</div>
+            <div style="font-size:10px;color:var(--text-2)">テキスト・画像など</div>
+          </div>
+          <div id="ftype-map" onclick="setFormatType('map')" style="flex:1;padding:10px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg-3);cursor:pointer;text-align:center">
+            <div style="font-size:18px;margin-bottom:4px">🗺</div>
+            <div style="font-size:12px;font-weight:600;color:var(--text-1)">マップ</div>
+            <div style="font-size:10px;color:var(--text-2)">グリッド配置</div>
+          </div>
+        </div>
+      </div>
+      <input type="hidden" id="format-type-input" value="normal">
+      <div id="format-normal-settings">
       <div class="divider"></div>
       <div class="divider"></div>
       <div class="section-header-row">
@@ -434,6 +459,18 @@ body.viewer-mode .image-thumb {
         <button class="btn btn-secondary btn-sm" onclick="addSection()">＋ 大項目を追加</button>
       </div>
       <div id="format-sections-list"></div>
+      </div>
+      <div id="format-map-settings" style="display:none">
+      <div class="divider"></div>
+      <div class="field-group">
+        <label class="field-label">グリッドサイズ</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input class="field-input" type="number" id="map-cols-input" value="20" min="5" max="100" style="width:80px;text-align:center"> 列
+          <span style="color:var(--text-2)">×</span>
+          <input class="field-input" type="number" id="map-rows-input" value="20" min="5" max="100" style="width:80px;text-align:center"> 行
+        </div>
+      </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary flex-1" onclick="closeModal('modal-format')">キャンセル</button>
@@ -592,6 +629,42 @@ body.viewer-mode .image-thumb {
     <div class="modal-footer">
       <button class="btn btn-secondary flex-1" onclick="closeModal('modal-trimmer')">キャンセル</button>
       <button class="btn btn-primary flex-1" onclick="applyTrimmer()">これで設定</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAP CELL EDIT MODAL -->
+<div class="modal-overlay" id="modal-map-cell">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span>マスを編集</span><button class="btn-icon" onclick="closeModal('modal-map-cell')">✕</button></div>
+    <div class="modal-body">
+      <div class="field-group">
+        <label class="field-label">絵文字</label>
+        <input class="field-input" type="text" id="map-cell-emoji" placeholder="例：🏔🌲🏰🌊" style="font-size:24px;text-align:center">
+      </div>
+      <div class="field-group">
+        <label class="field-label">場所名・テキスト</label>
+        <input class="field-input" type="text" id="map-cell-text" placeholder="例：竜の山脈">
+      </div>
+      <div class="field-group">
+        <label class="field-label">背景色</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div onclick="setMapCellColor('')" style="width:28px;height:28px;border-radius:6px;background:var(--bg-2);border:2px solid var(--border);cursor:pointer" title="デフォルト"></div>
+          <div onclick="setMapCellColor('#1a3a2a')" style="width:28px;height:28px;border-radius:6px;background:#1a3a2a;cursor:pointer"></div>
+          <div onclick="setMapCellColor('#1a2a3a')" style="width:28px;height:28px;border-radius:6px;background:#1a2a3a;cursor:pointer"></div>
+          <div onclick="setMapCellColor('#3a2a1a')" style="width:28px;height:28px;border-radius:6px;background:#3a2a1a;cursor:pointer"></div>
+          <div onclick="setMapCellColor('#3a1a1a')" style="width:28px;height:28px;border-radius:6px;background:#3a1a1a;cursor:pointer"></div>
+          <div onclick="setMapCellColor('#2a1a3a')" style="width:28px;height:28px;border-radius:6px;background:#2a1a3a;cursor:pointer"></div>
+          <div onclick="setMapCellColor('#1a3a3a')" style="width:28px;height:28px;border-radius:6px;background:#1a3a3a;cursor:pointer"></div>
+          <div onclick="setMapCellColor('#2a2a2a')" style="width:28px;height:28px;border-radius:6px;background:#2a2a2a;cursor:pointer"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" onclick="clearMapCell()">クリア</button>
+      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-map-cell')">キャンセル</button>
+      <button class="btn btn-primary flex-1" onclick="saveMapCell()">保存</button>
     </div>
   </div>
 </div>
@@ -1931,6 +2004,7 @@ function openFormatCreateModal(){
   editingFormatId=null;document.getElementById('modal-format-title').textContent='フォーマットを作成';
   document.getElementById('format-name-input').value='';pendingSections=[];pendingOutputSets=[];
   Object.keys(formatCollapseState).forEach(k=>delete formatCollapseState[k]);
+  setFormatType('normal');
   renderPendingSections();renderPendingOutputSets();openModal('modal-format');setTimeout(()=>document.getElementById('format-name-input').focus(),300);
 }
 async function openFormatEditModal(id){
@@ -1941,6 +2015,11 @@ async function openFormatEditModal(id){
   pendingOutputSets=(fmt.outputSets||[]).map(s=>({...s,fieldKeys:[...(s.fieldKeys||[])]}));
   outputSetCollapsed={};
   Object.keys(formatCollapseState).forEach(k=>delete formatCollapseState[k]);
+  setFormatType(fmt.type||'normal');
+  if(fmt.type==='map'){
+    document.getElementById('map-cols-input').value=fmt.mapCols||20;
+    document.getElementById('map-rows-input').value=fmt.mapRows||20;
+  }
   renderPendingSections();renderPendingOutputSets();openModal('modal-format');
 }
 function renderPendingSections(){
@@ -2043,7 +2122,11 @@ async function saveFormat(){
   const name=document.getElementById('format-name-input').value.trim();if(!name){showToast('フォーマット名を入力してください');return;}
   const sections=pendingSections.map((s,i)=>({...s,order:i,fields:s.fields.map((f,j)=>({...f,order:j}))}));
   if(editingFormatId){
-    const fmt=await fbGet('formats',editingFormatId);fmt.name=name;fmt.sections=sections;fmt.outputSets=pendingOutputSets;fmt.updatedAt=now();
+    const fmt=await fbGet('formats',editingFormatId);fmt.name=name;fmt.sections=sections;fmt.outputSets=pendingOutputSets;
+    const ftype=document.getElementById('format-type-input').value||'normal';
+    fmt.type=ftype;
+    if(ftype==='map'){fmt.mapCols=parseInt(document.getElementById('map-cols-input').value)||20;fmt.mapRows=parseInt(document.getElementById('map-rows-input').value)||20;}
+    fmt.updatedAt=now();
     await fbPut('formats',fmt);
     const memos=await fbGetAll('memos');
     for(const memo of memos.filter(m=>m.formatId===editingFormatId)){
@@ -2055,7 +2138,10 @@ async function saveFormat(){
       memo.fieldValues=newVals;memo.updatedAt=now();await fbPut('memos',memo);
     }
   }else{
-    await fbPut('formats',{id:uuid(),name,sections,outputSets:pendingOutputSets,createdAt:now(),updatedAt:now()});
+    const ftype=document.getElementById('format-type-input').value||'normal';
+    const mapCols=ftype==='map'?parseInt(document.getElementById('map-cols-input').value)||20:undefined;
+    const mapRows=ftype==='map'?parseInt(document.getElementById('map-rows-input').value)||20:undefined;
+    await fbPut('formats',{id:uuid(),name,sections,outputSets:pendingOutputSets,type:ftype,mapCols,mapRows,createdAt:now(),updatedAt:now()});
   }
   closeModal('modal-format');loadFormats();showToast('保存しました');
 }
@@ -2470,6 +2556,124 @@ async function exportXlsx(){
   a.click();
   URL.revokeObjectURL(url);
   showToast('CSVを出力しました');
+}
+
+
+// ===== FORMAT TYPE =====
+let currentFormatType = 'normal';
+function setFormatType(type){
+  currentFormatType = type;
+  const normalEl=document.getElementById('format-normal-settings');
+  const mapEl=document.getElementById('format-map-settings');
+  const btnNormal=document.getElementById('ftype-normal');
+  const btnMap=document.getElementById('ftype-map');
+  if(type==='normal'){
+    if(normalEl)normalEl.style.display='block';
+    if(mapEl)mapEl.style.display='none';
+    if(btnNormal){btnNormal.style.borderColor='var(--accent)';btnNormal.style.background='var(--accent-glow)';}
+    if(btnMap){btnMap.style.borderColor='var(--border)';btnMap.style.background='var(--bg-3)';}
+    document.getElementById('format-type-input').value='normal';
+  }else{
+    if(normalEl)normalEl.style.display='none';
+    if(mapEl)mapEl.style.display='block';
+    if(btnNormal){btnNormal.style.borderColor='var(--border)';btnNormal.style.background='var(--bg-3)';}
+    if(btnMap){btnMap.style.borderColor='var(--accent)';btnMap.style.background='var(--accent-glow)';}
+    document.getElementById('format-type-input').value='map';
+  }
+}
+
+// ===== MAP EDITOR =====
+let editingMapKey = null; // 'row_col'
+let editingMapCellColor = '';
+let currentMapData = {}; // {row_col: {emoji, text, color}}
+
+function renderMapView(fmt, memoData, isEdit){
+  const cols = fmt.mapCols||20;
+  const rows = fmt.mapRows||20;
+  const cellSize = 52;
+  let html = `<div style="overflow:auto;-webkit-overflow-scrolling:touch;max-height:calc(100dvh - 180px)">`;
+  html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">`;
+  if(isEdit){
+    html += `<span style="font-size:12px;color:var(--text-2)">マスをタップして編集</span>`;
+    html += `<button class="btn btn-secondary btn-sm" onclick="openMapSizeModal()">サイズ変更</button>`;
+  }
+  html += `</div>`;
+  html += `<div class="map-grid" style="grid-template-columns:repeat(${cols},${cellSize}px);width:${cols*cellSize+cols}px">`;
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const key=`${r}_${c}`;
+      const cell=(memoData||{})[key]||{};
+      const isEmpty=!cell.emoji&&!cell.text;
+      const bg=cell.color?`background:${cell.color}`:'' ;
+      const clickAttr=isEdit?`onclick="openMapCellEdit('${key}')"`:'';
+      html+=`<div class="map-cell${isEmpty?' map-cell-empty':''}" style="${bg}" ${clickAttr}>
+        <div class="map-cell-emoji">${cell.emoji||'·'}</div>
+        ${cell.text?`<div class="map-cell-text">${esc(cell.text)}</div>`:''}
+      </div>`;
+    }
+  }
+  html+=`</div></div>`;
+  return html;
+}
+
+function openMapCellEdit(key){
+  if(!isAdmin)return;
+  editingMapKey=key;
+  const cell=(currentMemo.fieldValues?.map||{})[key]||{};
+  editingMapCellColor=cell.color||'';
+  document.getElementById('map-cell-emoji').value=cell.emoji||'';
+  document.getElementById('map-cell-text').value=cell.text||'';
+  openModal('modal-map-cell');
+  setTimeout(()=>document.getElementById('map-cell-emoji').focus(),300);
+}
+
+function setMapCellColor(color){
+  editingMapCellColor=color;
+}
+
+function saveMapCell(){
+  if(!editingMapKey||!currentMemo)return;
+  if(!currentMemo.fieldValues)currentMemo.fieldValues={};
+  if(!currentMemo.fieldValues.map)currentMemo.fieldValues.map={};
+  const emoji=document.getElementById('map-cell-emoji').value.trim();
+  const text=document.getElementById('map-cell-text').value.trim();
+  if(emoji||text){
+    currentMemo.fieldValues.map[editingMapKey]={emoji,text,color:editingMapCellColor};
+  }else{
+    delete currentMemo.fieldValues.map[editingMapKey];
+  }
+  fbPut('memos',currentMemo);
+  closeModal('modal-map-cell');
+  // マップを再描画
+  const mapEl=document.getElementById('map-render-area');
+  if(mapEl)mapEl.innerHTML=renderMapView(currentFormat,currentMemo.fieldValues?.map||{},true);
+}
+
+function clearMapCell(){
+  if(!editingMapKey||!currentMemo)return;
+  if(currentMemo.fieldValues?.map){
+    delete currentMemo.fieldValues.map[editingMapKey];
+    fbPut('memos',currentMemo);
+  }
+  closeModal('modal-map-cell');
+  const mapEl=document.getElementById('map-render-area');
+  if(mapEl)mapEl.innerHTML=renderMapView(currentFormat,currentMemo.fieldValues?.map||{},true);
+}
+
+function openMapSizeModal(){
+  const cols=prompt('列数（横）を入力してください',currentFormat.mapCols||20);
+  if(!cols)return;
+  const rows=prompt('行数（縦）を入力してください',currentFormat.mapRows||20);
+  if(!rows)return;
+  const c=Math.min(100,Math.max(5,parseInt(cols)||20));
+  const r=Math.min(100,Math.max(5,parseInt(rows)||20));
+  currentFormat.mapCols=c;
+  currentFormat.mapRows=r;
+  fbPut('formats',currentFormat);
+  _cache.formats[currentFormat.id]=currentFormat;
+  const mapEl=document.getElementById('map-render-area');
+  if(mapEl)mapEl.innerHTML=renderMapView(currentFormat,currentMemo.fieldValues?.map||{},true);
+  showToast(`${c}×${r}に変更しました`);
 }
 
 // ===== BACKUP =====
