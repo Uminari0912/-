@@ -930,15 +930,13 @@ function renderMemoList(memos){
     const coverHtml=m.coverImage
       ?`<div class="memo-card-cover"><img src="${m.coverImage}" alt=""></div>`
       :`<div class="memo-card-cover"><span class="memo-card-cover-placeholder">👤</span></div>`;
-    const lockIcon=m.locked?'🔒':'';
     const editActions=currentMode==='edit'?`
       <div class="memo-card-actions">
-        <div class="drag-handle" draggable="true" 
-          ondragstart="onDragStart(event,${i})" 
-          ondragend="onDragEnd(event)">⠿</div>
+        <button class="btn-icon" style="width:28px;height:28px;font-size:12px${i===0?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveMemo(${i},-1)" title="上へ">↑</button>
+        <button class="btn-icon" style="width:28px;height:28px;font-size:12px${i===allMemos.length-1?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveMemo(${i},1)" title="下へ">↓</button>
         <button class="btn-icon" style="width:28px;height:28px;font-size:12px" onclick="event.stopPropagation();toggleMemoLock('${m.id}')" title="${m.locked?'ロック解除':'ロック'}">${m.locked?'🔒':'🔓'}</button>
         <button class="btn-icon" style="width:28px;height:28px;font-size:12px" onclick="event.stopPropagation();duplicateMemo('${m.id}')" title="複製">⧉</button>
-        <button class="btn-icon" style="width:28px;height:28px;font-size:12px;color:var(--danger)" onclick="event.stopPropagation();deleteMemo('${m.id}')">✕</button>
+        <button class="btn-icon" style="width:28px;height:28px;font-size:12px;color:var(--danger)${m.locked?';opacity:0.3;pointer-events:none':''}" onclick="event.stopPropagation();deleteMemo('${m.id}')">✕</button>
       </div>`:'';
     const dragAttrs=currentMode==='edit'
       ?`ondragover="onDragOver(event,${i})" ondrop="onDrop(event,${i})" ondragleave="onDragLeave(event)"`
@@ -990,6 +988,21 @@ function updateModeUI(){
 }
 
 // ===== DRAG SORT =====
+async function moveMemo(idx, dir){
+  const newIdx = idx + dir;
+  if(newIdx < 0 || newIdx >= allMemos.length) return;
+  // sortOrderを入れ替え
+  const a = allMemos[idx];
+  const b = allMemos[newIdx];
+  const tmpOrder = a.sortOrder ?? idx;
+  a.sortOrder = b.sortOrder ?? newIdx;
+  b.sortOrder = tmpOrder;
+  await Promise.all([fbPut('memos', a), fbPut('memos', b)]);
+  // allMemosを並び替えて再描画
+  allMemos.sort((x,y)=>(x.sortOrder??9999)-(y.sortOrder??9999));
+  renderMemoList(allMemos);
+}
+
 function onDragStart(e,idx){
   if(currentMode!=='edit')return;
   dragSrcIdx=idx;
