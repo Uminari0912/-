@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="CharaMemo">
-<title>CharaMemo</title>
+<meta name="apple-mobile-web-app-title" content="設定メモ">
+<title>設定メモ</title>
 <!-- Firebase SDKs (compat version - no module needed) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -162,29 +162,7 @@ html,body{height:100%;width:100%;background:var(--bg-0);color:var(--text-0);font
 .modal-footer{padding:10px 18px 0;display:flex;gap:10px;flex-shrink:0;}
 
 /* OUTPUT */
-/* MAP */
-/* GRAPH */
-.graph-container{position:relative;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-x pan-y;width:100%;height:calc(100dvh - 200px);}
-.graph-canvas{position:relative;width:2000px;height:1500px;}
-.graph-svg{position:absolute;top:0;left:0;width:2000px;height:1500px;pointer-events:none;}
-.graph-svg line.edge-tap{pointer-events:all;cursor:pointer;}
-.graph-node{position:absolute;width:72px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;user-select:none;-webkit-user-select:none;}
-.graph-node-img{width:56px;height:56px;border-radius:10px;object-fit:cover;border:2px solid var(--border);background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden;flex-shrink:0;}
-.graph-node-img.connecting{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
-.graph-node-name{font-size:9px;color:var(--text-1);text-align:center;word-break:break-all;max-width:72px;line-height:1.3;}
-.graph-legend{position:absolute;top:8px;left:8px;background:rgba(18,20,29,0.9);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;z-index:10;min-width:100px;}
-.graph-legend-item{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;color:var(--text-1);}
-.graph-legend-line{width:20px;height:3px;border-radius:2px;flex-shrink:0;}
 
-.map-scroll-area{overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-x pan-y;max-height:calc(100dvh - 220px);}
-.map-grid{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);}
-.map-zoom-wrap{transform-origin:top left;will-change:transform;}
-.map-cell{background:var(--bg-2);min-width:52px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:2px;padding:2px;position:relative;-webkit-tap-highlight-color:rgba(124,106,245,0.2);}
-.map-cell:active{background:var(--accent-glow);}
-.map-cell-emoji{font-size:22px;line-height:1;}
-.map-cell-text{font-size:9px;color:var(--text-1);text-align:center;word-break:break-all;max-width:48px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
-.map-cell-empty .map-cell-emoji{opacity:0.15;}
-.map-cell-note-dot{position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:0.8;}
 
 .output-text{background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-all;max-height:50dvh;overflow-y:auto;}
 
@@ -316,7 +294,7 @@ body.viewer-mode .image-thumb {
 <!-- ログイン画面 -->
 <div id="login-screen" style="display:none;height:100dvh;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px;background:var(--bg-0)">
   <div style="font-size:28px;font-weight:700;color:var(--accent);margin-bottom:8px;letter-spacing:0.05em">CHARA</div>
-  <div style="font-size:13px;color:var(--text-2);margin-bottom:40px">キャラクター設定データベース</div>
+  <div style="font-size:13px;color:var(--text-2);margin-bottom:40px">設定メモ管理</div>
   <div style="width:100%;max-width:340px">
     <div class="field-group">
       <label class="field-label">メールアドレス</label>
@@ -443,27 +421,7 @@ body.viewer-mode .image-thumb {
     <div class="modal-handle"></div>
     <div class="modal-header"><span id="modal-format-title">フォーマットを作成</span><button class="btn-icon" onclick="closeModal('modal-format')">✕</button></div>
     <div class="modal-body">
-      <div class="field-group"><label class="field-label">フォーマット名</label><input class="field-input" type="text" id="format-name-input" placeholder="例：キャラクター設定"></div>
-      <div class="field-group">
-        <label class="field-label">種類</label>
-        <div style="display:flex;gap:8px">
-          <div id="ftype-normal" onclick="setFormatType('normal')" style="flex:1;padding:10px;border-radius:var(--radius-sm);border:2px solid var(--accent);background:var(--accent-glow);cursor:pointer;text-align:center">
-            <div style="font-size:18px;margin-bottom:4px">📝</div>
-            <div style="font-size:12px;font-weight:600;color:var(--accent)">通常</div>
-            <div style="font-size:10px;color:var(--text-2)">テキスト・画像など</div>
-          </div>
-          <div id="ftype-map" onclick="setFormatType('map')" style="flex:1;padding:10px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg-3);cursor:pointer;text-align:center">
-            <div style="font-size:18px;margin-bottom:4px">🗺</div>
-            <div style="font-size:12px;font-weight:600;color:var(--text-1)">マップ</div>
-            <div style="font-size:10px;color:var(--text-2)">グリッド配置</div>
-          </div>
-          <div id="ftype-graph" onclick="setFormatType('graph')" style="flex:1;padding:10px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg-3);cursor:pointer;text-align:center">
-            <div style="font-size:18px;margin-bottom:4px">🕸</div>
-            <div style="font-size:12px;font-weight:600;color:var(--text-1)">関係図</div>
-            <div style="font-size:10px;color:var(--text-2)">ノード&ライン</div>
-          </div>
-        </div>
-      </div>
+      <div class="field-group"><label class="field-label">フォーマット名</label><input class="field-input" type="text" id="format-name-input" placeholder="例：設定メモ"></div>
       <input type="hidden" id="format-type-input" value="normal">
       <div id="format-normal-settings">
       <div class="divider"></div>
@@ -480,17 +438,6 @@ body.viewer-mode .image-thumb {
         <button class="btn btn-secondary btn-sm" onclick="addSection()">＋ 大項目を追加</button>
       </div>
       <div id="format-sections-list"></div>
-      </div>
-      <div id="format-map-settings" style="display:none">
-      <div class="divider"></div>
-      <div class="field-group">
-        <label class="field-label">グリッドサイズ</label>
-        <div style="display:flex;align-items:center;gap:8px">
-          <input class="field-input" type="number" id="map-cols-input" value="20" min="5" max="100" style="width:80px;text-align:center"> 列
-          <span style="color:var(--text-2)">×</span>
-          <input class="field-input" type="number" id="map-rows-input" value="20" min="5" max="100" style="width:80px;text-align:center"> 行
-        </div>
-      </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -654,117 +601,13 @@ body.viewer-mode .image-thumb {
   </div>
 </div>
 
-<!-- MAP CELL EDIT MODAL -->
-<div class="modal-overlay" id="modal-map-cell">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-header"><span>マスを編集</span><button class="btn-icon" onclick="closeModal('modal-map-cell')">✕</button></div>
-    <div class="modal-body">
-      <div class="field-group">
-        <label class="field-label">絵文字</label>
-        <input class="field-input" type="text" id="map-cell-emoji" placeholder="例：🏔🌲🏰🌊" style="font-size:24px;text-align:center">
-      </div>
-      <div class="field-group">
-        <label class="field-label">場所名・テキスト</label>
-        <input class="field-input" type="text" id="map-cell-text" placeholder="例：竜の山脈">
-      </div>
-      <div class="field-group">
-        <label class="field-label">説明・メモ</label>
-        <textarea class="field-textarea" id="map-cell-note" placeholder="この場所の説明を入力..." style="min-height:80px;font-size:13px"></textarea>
-      </div>
-      <div class="field-group">
-        <label class="field-label">背景色</label>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <div class="map-color-btn" data-color="" onclick="setMapCellColor('')" style="width:32px;height:32px;border-radius:6px;background:var(--bg-2);border:2px solid var(--border);cursor:pointer" title="デフォルト"></div>
-          <div class="map-color-btn" data-color="#1a3a2a" onclick="setMapCellColor('#1a3a2a')" style="width:32px;height:32px;border-radius:6px;background:#1a3a2a;cursor:pointer"></div>
-          <div class="map-color-btn" data-color="#1a2a3a" onclick="setMapCellColor('#1a2a3a')" style="width:32px;height:32px;border-radius:6px;background:#1a2a3a;cursor:pointer"></div>
-          <div class="map-color-btn" data-color="#3a2a1a" onclick="setMapCellColor('#3a2a1a')" style="width:32px;height:32px;border-radius:6px;background:#3a2a1a;cursor:pointer"></div>
-          <div class="map-color-btn" data-color="#3a1a1a" onclick="setMapCellColor('#3a1a1a')" style="width:32px;height:32px;border-radius:6px;background:#3a1a1a;cursor:pointer"></div>
-          <div class="map-color-btn" data-color="#2a1a3a" onclick="setMapCellColor('#2a1a3a')" style="width:32px;height:32px;border-radius:6px;background:#2a1a3a;cursor:pointer"></div>
-          <div class="map-color-btn" data-color="#1a3a3a" onclick="setMapCellColor('#1a3a3a')" style="width:32px;height:32px;border-radius:6px;background:#1a3a3a;cursor:pointer"></div>
-          <div class="map-color-btn" data-color="#2a2a2a" onclick="setMapCellColor('#2a2a2a')" style="width:32px;height:32px;border-radius:6px;background:#2a2a2a;cursor:pointer"></div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary flex-1" onclick="clearMapCell()">クリア</button>
-      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-map-cell')">キャンセル</button>
-      <button class="btn btn-primary flex-1" onclick="saveMapCell()">保存</button>
-    </div>
-  </div>
-</div>
 
-<!-- GRAPH EDGE VIEW MODAL -->
-<div class="modal-overlay" id="modal-graph-edge">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-header"><span id="graph-edge-title">関係の詳細</span><button class="btn-icon" onclick="closeModal('modal-graph-edge')">✕</button></div>
-    <div class="modal-body">
-      <div id="graph-edge-view-area"></div>
-      <div id="graph-edge-edit-area" style="display:none">
-        <div class="field-group">
-          <label class="field-label">関係の種類</label>
-          <div id="graph-edge-type-picker" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-        </div>
-        <div class="field-group"><label class="field-label">物理的関係</label><textarea class="field-textarea" id="graph-edge-physical" placeholder="例：同じ学校の同級生" style="min-height:60px"></textarea></div>
-        <div class="field-group"><label class="field-label">精神的関係</label><textarea class="field-textarea" id="graph-edge-mental" placeholder="例：お互いを信頼している" style="min-height:60px"></textarea></div>
-        <div class="field-group"><label class="field-label">性格の相性</label><textarea class="field-textarea" id="graph-edge-compat" placeholder="例：明るさが補い合う" style="min-height:60px"></textarea></div>
-      </div>
-    </div>
-    <div class="modal-footer" id="graph-edge-footer"></div>
-  </div>
-</div>
 
-<!-- GRAPH RELATION TYPE MODAL -->
-<div class="modal-overlay" id="modal-graph-reltype">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-header"><span>関係の種類を管理</span><button class="btn-icon" onclick="closeModal('modal-graph-reltype')">✕</button></div>
-    <div class="modal-body">
-      <div id="graph-reltype-list"></div>
-      <button class="btn btn-secondary btn-full" onclick="addRelationType()" style="margin-top:8px">＋ 種類を追加</button>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-primary btn-full" onclick="saveRelationTypes()">保存</button>
-    </div>
-  </div>
-</div>
 
-<!-- MAP VIEW MODAL -->
-<div class="modal-overlay" id="modal-map-view">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-header"><span id="map-view-title"></span><button class="btn-icon" onclick="closeModal('modal-map-view')">✕</button></div>
-    <div class="modal-body">
-      <p id="map-view-note" style="font-size:14px;line-height:1.7;color:var(--text-0);white-space:pre-wrap"></p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-primary btn-full" onclick="closeModal('modal-map-view')">閉じる</button>
-    </div>
-  </div>
-</div>
 
-<!-- MAP SIZE MODAL -->
-<div class="modal-overlay" id="modal-map-size">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-header"><span>マップサイズ変更</span><button class="btn-icon" onclick="closeModal('modal-map-size')">✕</button></div>
-    <div class="modal-body">
-      <div class="field-group">
-        <label class="field-label">列数（横）</label>
-        <input class="field-input" type="number" id="map-size-cols" min="5" max="100" value="20">
-      </div>
-      <div class="field-group">
-        <label class="field-label">行数（縦）</label>
-        <input class="field-input" type="number" id="map-size-rows" min="5" max="100" value="20">
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-map-size')">キャンセル</button>
-      <button class="btn btn-primary flex-1" onclick="saveMapSize()">変更</button>
-    </div>
-  </div>
-</div>
+
+
+
 
 <!-- COPY TO MODAL -->
 <div class="modal-overlay" id="modal-copy-to">
@@ -772,7 +615,7 @@ body.viewer-mode .image-thumb {
     <div class="modal-handle"></div>
     <div class="modal-header"><span>コピー先のキャラを選択</span><button class="btn-icon" onclick="closeModal('modal-copy-to')">✕</button></div>
     <div class="modal-body">
-      <p style="color:var(--text-2);font-size:13px;margin-bottom:12px;line-height:1.6">選んだキャラの全データを上書きします。この操作は取り消せません。</p>
+      <p style="color:var(--text-2);font-size:13px;margin-bottom:12px;line-height:1.6">選んだメモの全データを上書きします。この操作は取り消せません。</p>
       <div id="copy-to-list"></div>
     </div>
   </div>
@@ -1210,7 +1053,7 @@ async function createMemo(){
   const title=document.getElementById('new-memo-title').value.trim();
   const rawId=document.getElementById('new-memo-id').value.trim();
   const formatId=document.getElementById('new-memo-format').value;
-  if(!title){showToast('キャラ名を入力してください');return;}
+  if(!title){showToast('タイトルを入力してください');return;}
   let memoId=rawId;
   if(memoId){
     if(!/^[a-zA-Z0-9_-]+$/.test(memoId)){showToast('IDは英数字・_・-のみ');return;}
@@ -1272,38 +1115,7 @@ function renderMemoDetail(){
   const m=currentMemo,fmt=currentFormat,isEdit=currentMode==='edit'&&!m.locked&&isAdmin;
   let html='';
 
-  // 関係図型フォーマット
-  if(fmt.type==='graph'){
-    // キャッシュから同グループのメモを全取得（allMemosは現グループのみなので）
-    const graphMemos=Object.values(_cache.memos||{}).filter(mm=>mm.groupId===m.groupId&&mm.id!==m.id&&(!_cache.formats||!_cache.formats[mm.formatId]||(_cache.formats[mm.formatId].type||'normal')==='normal'));
-    let ghtml=`<div style="padding:12px">`;
-    if(isEdit){
-      ghtml+=`<input class="field-input" style="font-size:20px;font-weight:700;margin-bottom:12px" value="${esc(m.title||'')}" placeholder="タイトル" oninput="currentMemo.title=this.value;onMemoChange()">`;
-    }else{
-      ghtml+=`<div style="font-size:20px;font-weight:700;margin-bottom:12px;color:var(--text-0)">${esc(m.title||'（名称未設定）')}</div>`;
-    }
-    ghtml+=`<div id="graph-render-area">${renderGraphView(m,graphMemos,isEdit)}</div>`;
-    ghtml+=`</div>`;
-    el.innerHTML=ghtml;
-    updateUndoRedoUI();
-    initGraphEvents();
-    return;
-  }
 
-  // マップ型フォーマットの場合は別描画
-  if(fmt.type==='map'){
-    let mapHtml=`<div style="padding:12px">`;
-    if(isEdit){
-      mapHtml+=`<input class="field-input" style="font-size:20px;font-weight:700;margin-bottom:12px" value="${esc(m.title||'')}" placeholder="タイトル" oninput="currentMemo.title=this.value;onMemoChange()">`;
-    }else{
-      mapHtml+=`<div style="font-size:20px;font-weight:700;margin-bottom:12px;color:var(--text-0)">${esc(m.title||'（名称未設定）')}</div>`;
-    }
-    mapHtml+=`<div id="map-render-area">${renderMapView(fmt,m.fieldValues?.map||{},isEdit)}</div>`;
-    mapHtml+=`</div>`;
-    el.innerHTML=mapHtml;
-    updateUndoRedoUI();
-    return;
-  }
 
   // Cover image
   const isLocked=m.locked&&!isEdit;
@@ -1575,7 +1387,7 @@ async function saveMemoNow(){
 
   // Check title change
   if(titleEl&&currentMemo.title!==oldTitle){
-    historyEntries.unshift({time:now(),field:'キャラ名',before:oldTitle,after:currentMemo.title});
+    historyEntries.unshift({time:now(),field:'タイトル',before:oldTitle,after:currentMemo.title});
   }
 
   // Check field changes
@@ -1753,7 +1565,7 @@ function openCopyToModal(){
   const candidates=allMemos.filter(m=>m.id!==currentMemo.id);
   const el=document.getElementById('copy-to-list');
   if(!candidates.length){
-    el.innerHTML=`<p style="color:var(--text-2);font-size:13px;padding:12px 0">コピー先のキャラがいません</p>`;
+    el.innerHTML=`<p style="color:var(--text-2);font-size:13px;padding:12px 0">コピー先のメモがいません</p>`;
     openModal('modal-copy-to');return;
   }
   el.innerHTML=candidates.map(m=>`
@@ -1788,7 +1600,7 @@ function openLinkSelectModal(){
   const links=currentMemo.linkedMemos||[];
   const candidates=allMemos.filter(m=>m.id!==currentMemo.id&&!links.includes(m.id));
   const el=document.getElementById('link-select-list');
-  if(!candidates.length){el.innerHTML=`<p style="color:var(--text-2);font-size:13px;padding:12px 0">追加できるキャラがいません</p>`;openModal('modal-link-select');return;}
+  if(!candidates.length){el.innerHTML=`<p style="color:var(--text-2);font-size:13px;padding:12px 0">追加できるメモがありません</p>`;openModal('modal-link-select');return;}
   el.innerHTML=candidates.map(m=>`
     <div class="card" onclick="addMemoLink('${m.id}')">
       <div class="card-title">${esc(m.title||'（名称未設定）')}</div>
@@ -2146,11 +1958,6 @@ async function openFormatEditModal(id){
   pendingOutputSets=(fmt.outputSets||[]).map(s=>({...s,fieldKeys:[...(s.fieldKeys||[])]}));
   outputSetCollapsed={};
   Object.keys(formatCollapseState).forEach(k=>delete formatCollapseState[k]);
-  setFormatType(fmt.type||'normal');
-  if(fmt.type==='map'){
-    document.getElementById('map-cols-input').value=fmt.mapCols||20;
-    document.getElementById('map-rows-input').value=fmt.mapRows||20;
-  }
   renderPendingSections();renderPendingOutputSets();openModal('modal-format');
 }
 function renderPendingSections(){
@@ -2695,712 +2502,11 @@ async function exportXlsx(){
 
 
 // ===== FORMAT TYPE =====
-let currentFormatType = 'normal';
 function setFormatType(type){
-  currentFormatType = type;
-  const normalEl=document.getElementById('format-normal-settings');
-  const mapEl=document.getElementById('format-map-settings');
-  const btnNormal=document.getElementById('ftype-normal');
-  const btnMap=document.getElementById('ftype-map');
-  const btnGraph=document.getElementById('ftype-graph');
-  if(type==='normal'){
-    if(normalEl)normalEl.style.display='block';
-    if(mapEl)mapEl.style.display='none';
-    if(btnNormal){btnNormal.style.borderColor='var(--accent)';btnNormal.style.background='var(--accent-glow)';}
-    if(btnMap){btnMap.style.borderColor='var(--border)';btnMap.style.background='var(--bg-3)';}
-    if(btnGraph){btnGraph.style.borderColor='var(--border)';btnGraph.style.background='var(--bg-3)';}
-    document.getElementById('format-type-input').value='normal';
-  }else if(type==='map'){
-    if(normalEl)normalEl.style.display='none';
-    if(mapEl)mapEl.style.display='block';
-    if(btnNormal){btnNormal.style.borderColor='var(--border)';btnNormal.style.background='var(--bg-3)';}
-    if(btnMap){btnMap.style.borderColor='var(--accent)';btnMap.style.background='var(--accent-glow)';}
-    if(btnGraph){btnGraph.style.borderColor='var(--border)';btnGraph.style.background='var(--bg-3)';}
-    document.getElementById('format-type-input').value='map';
-  }else{
-    if(normalEl)normalEl.style.display='none';
-    if(mapEl)mapEl.style.display='none';
-    if(btnNormal){btnNormal.style.borderColor='var(--border)';btnNormal.style.background='var(--bg-3)';}
-    if(btnMap){btnMap.style.borderColor='var(--border)';btnMap.style.background='var(--bg-3)';}
-    if(btnGraph){btnGraph.style.borderColor='var(--accent)';btnGraph.style.background='var(--accent-glow)';}
-    document.getElementById('format-type-input').value='graph';
-  }
-}
-
-// ===== MAP EDITOR =====
-let editingMapKey = null;
-let editingMapCellColor = '';
-let mapSelectMode = false;
-let mapSelectedKeys = new Set();
-let mapZoom = 1;
-let editingRegionId = null; // 編集中の地域ID
-
-function getMapData(){ return currentMemo?.fieldValues?.map||{}; }
-function getRegions(){ return getMapData().regions||{}; }
-function getCellRegionMap(){
-  // cellKey -> regionId のマップを作成
-  const map={};
-  const regions=getRegions();
-  for(const [rid,region] of Object.entries(regions)){
-    for(const key of (region.keys||[])) map[key]=rid;
-  }
-  return map;
-}
-
-function refreshMapView(){
-  const mapEl=document.getElementById('map-render-area');
-  if(mapEl&&currentFormat&&currentMemo)
-    mapEl.innerHTML=renderMapView(currentFormat,getMapData(),currentMode==='edit'&&!currentMemo.locked&&isAdmin);
-}
-
-function renderMapView(fmt, memoData, isEdit){
-  const cols=fmt.mapCols||20;
-  const rows=fmt.mapRows||20;
-  const cellSize=52;
-  const regions=memoData.regions||{};
-  const cellRegionMap={}; // key->regionId
-  for(const [rid,region] of Object.entries(regions)){
-    for(const key of (region.keys||[])) cellRegionMap[key]=rid;
-  }
-
-  let html=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">`;
-  if(isEdit){
-    html+=`<button class="btn btn-secondary btn-sm" onclick="toggleMapSelectMode()">${mapSelectMode?'✅ 選択中':'☐ 選択'}</button>`;
-    if(mapSelectMode&&mapSelectedKeys.size>0){
-      html+=`<button class="btn btn-primary btn-sm" onclick="openMapMultiEdit()">${mapSelectedKeys.size}マスで地域作成</button>`;
-      html+=`<button class="btn btn-secondary btn-sm" onclick="clearMapSelection()">解除</button>`;
-    }
-    html+=`<button class="btn btn-secondary btn-sm" onclick="openMapSizeModal()">サイズ</button>`;
-  }
-  html+=`<button class="btn btn-secondary btn-sm" onclick="changeMapZoom(0.25)" style="width:36px">＋</button>`;
-  html+=`<button class="btn btn-secondary btn-sm" onclick="changeMapZoom(-0.25)" style="width:36px">－</button>`;
-  html+=`<span style="font-size:11px;color:var(--text-2)" id="map-zoom-label">${Math.round(mapZoom*100)}%</span>`;
-  html+=`</div>`;
-  html+=`<div class="map-scroll-area" id="map-scroll-area">`;
-  html+=`<div class="map-zoom-wrap" id="map-zoom-wrap" style="transform:scale(${mapZoom});width:${cols*(cellSize+1)}px;height:${rows*(cellSize+1)}px">`;
-  html+=`<div class="map-grid" style="grid-template-columns:repeat(${cols},${cellSize}px)">`;
-
-  // 各地域の「中心マス」を計算（最初のkey）
-  const regionCenterKey={};
-  for(const [rid,region] of Object.entries(regions)){
-    if(region.keys&&region.keys.length>0) regionCenterKey[rid]=region.keys[0];
-  }
-
-  for(let r=0;r<rows;r++){
-    for(let c=0;c<cols;c++){
-      const key=`${r}_${c}`;
-      const regionId=cellRegionMap[key];
-      const region=regionId?regions[regionId]:null;
-      const isSelected=mapSelectedKeys.has(key);
-      const isCenter=region&&regionCenterKey[regionId]===key;
-      const bg=region?.color?`background:${region.color}`:'';
-      const selStyle=isSelected?'outline:2px solid var(--accent);outline-offset:-2px;':'';
-      const hasNote=!!(region?.note);
-      const isEmpty=!region;
-
-      let clickAttr='';
-      if(isEdit){
-        if(mapSelectMode){
-          clickAttr=`onclick="toggleMapCellSelect('${key}')"`;
-        } else if(region){
-          clickAttr=`onclick="openRegionEdit('${regionId}')"`;
-        } else {
-          clickAttr=''; // 空マスは選択モードのみ
-        }
-      } else {
-        if(region) clickAttr=`onclick="viewRegion('${regionId}')"`;
-      }
-
-      html+=`<div class="map-cell${isEmpty?' map-cell-empty':''}" style="${bg}${selStyle}" ${clickAttr}>
-        ${hasNote&&isCenter?'<div class="map-cell-note-dot"></div>':''}
-        <div class="map-cell-emoji">${isCenter?(region.emoji||'·'):'·'}</div>
-        ${isCenter&&region.name?`<div class="map-cell-text">${esc(region.name)}</div>`:''}
-      </div>`;
-    }
-  }
-  html+=`</div></div></div>`;
-
-  // 地域一覧（編集モード）
-  if(isEdit&&Object.keys(regions).length>0){
-    html+=`<div style="margin-top:12px"><div style="font-size:11px;color:var(--text-2);margin-bottom:6px;letter-spacing:0.05em">地域一覧</div>`;
-    for(const [rid,region] of Object.entries(regions)){
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:${region.color||'var(--bg-3)'};border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px">
-        <span style="font-size:18px">${region.emoji||'📍'}</span>
-        <span style="flex:1;font-size:13px;font-weight:600;color:var(--text-0)">${esc(region.name||'名称未設定')}</span>
-        <span style="font-size:11px;color:var(--text-2)">${(region.keys||[]).length}マス</span>
-        <button class="btn-icon" style="width:28px;height:28px;font-size:12px" onclick="openRegionEdit('${rid}')">✏</button>
-        <button class="btn-icon" style="width:28px;height:28px;font-size:12px;color:var(--danger)" onclick="deleteRegion('${rid}')">✕</button>
-      </div>`;
-    }
-    html+=`</div>`;
-  }
-  return html;
-}
-
-function viewRegion(regionId){
-  const region=getRegions()[regionId];
-  if(!region)return;
-  const name=[region.emoji,region.name].filter(Boolean).join(' ')||'（名称未設定）';
-  if(!region.note&&!region.name)return;
-  document.getElementById('map-view-title').textContent=name;
-  document.getElementById('map-view-note').textContent=region.note||'（説明なし）';
-  openModal('modal-map-view');
-}
-
-function openRegionEdit(regionId){
-  editingRegionId=regionId;
-  const region=getRegions()[regionId]||{};
-  editingMapCellColor=region.color||'';
-  document.getElementById('map-cell-emoji').value=region.emoji||'';
-  document.getElementById('map-cell-text').value=region.name||'';
-  document.getElementById('map-cell-note').value=region.note||'';
-  updateMapColorUI();
-  openModal('modal-map-cell');
-}
-
-function deleteRegion(regionId){
-  confirmDialog('地域を削除','この地域を削除しますか？（マスは空になります）','削除',()=>{
-    const mapData=getMapData();
-    if(!mapData.regions)return;
-    delete mapData.regions[regionId];
-    if(!currentMemo.fieldValues)currentMemo.fieldValues={};
-    currentMemo.fieldValues.map=mapData;
-    fbPut('memos',currentMemo);
-    refreshMapView();
-  });
-}
-
-function changeMapZoom(delta){
-  mapZoom=Math.max(0.3,Math.min(3,+(mapZoom+delta).toFixed(2)));
-  const wrap=document.getElementById('map-zoom-wrap');
-  const cols=currentFormat?.mapCols||20;
-  const rows=currentFormat?.mapRows||20;
-  const cellSize=52;
-  if(wrap){
-    wrap.style.transform=`scale(${mapZoom})`;
-    wrap.style.width=`${cols*(cellSize+1)}px`;
-    wrap.style.height=`${rows*(cellSize+1)}px`;
-  }
-  const lbl=document.getElementById('map-zoom-label');
-  if(lbl)lbl.textContent=Math.round(mapZoom*100)+'%';
-}
-
-function toggleMapSelectMode(){
-  mapSelectMode=!mapSelectMode;
-  if(!mapSelectMode)mapSelectedKeys.clear();
-  refreshMapView();
-}
-
-function clearMapSelection(){
-  mapSelectedKeys.clear();
-  refreshMapView();
-}
-
-function toggleMapCellSelect(key){
-  if(mapSelectedKeys.has(key))mapSelectedKeys.delete(key);
-  else mapSelectedKeys.add(key);
-  refreshMapView();
-}
-
-function openMapCellEdit(key){
-  // 単独マスタップは選択モードに誘導
-  mapSelectedKeys.add(key);
-  openMapMultiEdit();
-}
-
-function openMapMultiEdit(){
-  if(!isAdmin||mapSelectedKeys.size===0)return;
-  editingRegionId=null;
-  editingMapCellColor='';
-  document.getElementById('map-cell-emoji').value='';
-  document.getElementById('map-cell-text').value='';
-  document.getElementById('map-cell-note').value='';
-  updateMapColorUI();
-  openModal('modal-map-cell');
-}
-
-function setMapCellColor(color){
-  editingMapCellColor=color;
-  updateMapColorUI();
-}
-
-function updateMapColorUI(){
-  document.querySelectorAll('.map-color-btn').forEach(el=>{
-    const c=el.dataset.color||'';
-    el.style.outline=c===editingMapCellColor?'3px solid var(--accent)':'none';
-    el.style.outlineOffset='2px';
-  });
-}
-
-function saveMapCell(){
-  if(!currentMemo)return;
-  if(!currentMemo.fieldValues)currentMemo.fieldValues={};
-  if(!currentMemo.fieldValues.map)currentMemo.fieldValues.map={};
-  if(!currentMemo.fieldValues.map.regions)currentMemo.fieldValues.map.regions={};
-
-  const emoji=document.getElementById('map-cell-emoji').value.trim();
-  const name=document.getElementById('map-cell-text').value.trim();
-  const note=document.getElementById('map-cell-note').value.trim();
-
-  if(editingRegionId){
-    // 既存地域の編集
-    const region=currentMemo.fieldValues.map.regions[editingRegionId]||{};
-    currentMemo.fieldValues.map.regions[editingRegionId]={
-      ...region,
-      emoji,name,note,
-      color:editingMapCellColor||region.color||''
-    };
-  } else {
-    // 新規地域作成（選択マスから）
-    const keys=[...mapSelectedKeys];
-    if(!keys.length){closeModal('modal-map-cell');return;}
-    const rid='region_'+uuid();
-    currentMemo.fieldValues.map.regions[rid]={
-      emoji,name,note,
-      color:editingMapCellColor||'',
-      keys
-    };
-  }
-
-  mapSelectedKeys.clear();
-  mapSelectMode=false;
-  editingRegionId=null;
-  fbPut('memos',currentMemo);
-  closeModal('modal-map-cell');
-  refreshMapView();
-}
-
-function clearMapCell(){
-  if(!currentMemo||!editingRegionId)return;
-  if(currentMemo.fieldValues?.map?.regions){
-    delete currentMemo.fieldValues.map.regions[editingRegionId];
-    fbPut('memos',currentMemo);
-  }
-  editingRegionId=null;
-  mapSelectedKeys.clear();
-  mapSelectMode=false;
-  closeModal('modal-map-cell');
-  refreshMapView();
-}
-
-function openMapSizeModal(){
-  openMapSizeInputModal();
-}
-
-function openMapSizeInputModal(){
-  const cur=currentFormat;
-  document.getElementById('map-size-cols').value=cur.mapCols||20;
-  document.getElementById('map-size-rows').value=cur.mapRows||20;
-  openModal('modal-map-size');
-}
-
-function saveMapSize(){
-  const c=Math.min(100,Math.max(5,parseInt(document.getElementById('map-size-cols').value)||20));
-  const r=Math.min(100,Math.max(5,parseInt(document.getElementById('map-size-rows').value)||20));
-  currentFormat.mapCols=c;
-  currentFormat.mapRows=r;
-  fbPut('formats',currentFormat);
-  _cache.formats[currentFormat.id]=currentFormat;
-  closeModal('modal-map-size');
-  refreshMapView();
-  showToast(`${c}×${r}に変更しました`);
+  // 通常のみ対応
 }
 
 
-// ===== GRAPH EDITOR =====
-const GRAPH_W=2000,GRAPH_H=1500,NODE_W=72,NODE_H=90;
-let graphConnectMode=false;
-let graphConnectFrom=null;
-let graphZoom=1;
-let graphDragNodeId=null;
-let graphDragStartX=0,graphDragStartY=0;
-let graphDragNodeStartX=0,graphDragNodeStartY=0;
-let graphDragMoved=false;
-let editingEdgeId=null;
-let pendingRelationTypes=[];
-let selectedEdgeTypeId=null;
-
-const DEFAULT_REL_TYPES=[
-  {id:'rt1',name:'友人',color:'#7c6af5'},
-  {id:'rt2',name:'家族',color:'#4ec994'},
-  {id:'rt3',name:'恋愛',color:'#e05580'},
-  {id:'rt4',name:'敵',color:'#e05555'},
-  {id:'rt5',name:'知人',color:'#6a6a88'}
-];
-
-function getGraphData(){return currentMemo?.fieldValues?.graph||{};}
-function getGraphNodes(){return getGraphData().nodes||{};}
-function getGraphEdges(){return getGraphData().edges||{};}
-function getRelationTypes(){return getGraphData().relationTypes||DEFAULT_REL_TYPES;}
-function getRelTypeMap(){const m={};for(const t of getRelationTypes())m[t.id]=t;return m;}
-
-function renderGraphView(memo, nodeMemos, isEdit){
-  const gd=memo.fieldValues?.graph||{};
-  const nodes=gd.nodes||{};
-  const edges=gd.edges||{};
-  const relTypes=gd.relationTypes||DEFAULT_REL_TYPES;
-  const relTypeMap={};for(const t of relTypes)relTypeMap[t.id]=t;
-
-  // 位置が未設定のノードを自動配置
-  const cx=GRAPH_W/2,cy=GRAPH_H/2,radius=500;
-  const newNodes={...nodes};
-  nodeMemos.forEach((m,i)=>{
-    if(!newNodes[m.id]){
-      const angle=(2*Math.PI*i/nodeMemos.length)-Math.PI/2;
-      newNodes[m.id]={x:Math.round(cx+radius*Math.cos(angle)-NODE_W/2),y:Math.round(cy+radius*Math.sin(angle)-NODE_W/2)};
-    }
-  });
-  // 新規ノードがあれば保存
-  if(JSON.stringify(nodes)!==JSON.stringify(newNodes)){
-    if(!memo.fieldValues)memo.fieldValues={};
-    if(!memo.fieldValues.graph)memo.fieldValues.graph={};
-    memo.fieldValues.graph.nodes=newNodes;
-    fbPut('memos',memo);
-  }
-
-  // SVGのエッジ
-  let svgLines='';
-  for(const [eid,edge] of Object.entries(edges)){
-    const fp=newNodes[edge.from]||{x:0,y:0};
-    const tp=newNodes[edge.to]||{x:0,y:0};
-    const color=relTypeMap[edge.typeId]?.color||'#7c6af5';
-    const x1=fp.x+NODE_W/2,y1=fp.y+32,x2=tp.x+NODE_W/2,y2=tp.y+32;
-    svgLines+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`;
-    svgLines+=`<line class="edge-tap" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="24" onclick="openEdgeView('${eid}')"/>`;
-  }
-
-  // ノードHTML
-  let nodesHtml='';
-  for(const m of nodeMemos){
-    const pos=newNodes[m.id]||{x:100,y:100};
-    const isConnecting=graphConnectMode&&graphConnectFrom===m.id;
-    const imgContent=m.coverImage
-      ?`<img src="${m.coverImage}" style="width:56px;height:56px;object-fit:cover">`
-      :`<span style="font-size:24px">👤</span>`;
-    const connectStyle=isConnecting?'border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);':''
-    nodesHtml+=`<div class="graph-node" id="gnode-${m.id}" style="left:${pos.x}px;top:${pos.y}px"
-      ontouchstart="graphNodeTouchStart(event,'${m.id}')"
-      onmousedown="graphNodeMouseDown(event,'${m.id}')">
-      <div class="graph-node-img" style="${connectStyle}">${imgContent}</div>
-      <div class="graph-node-name">${esc(m.title||m.id)}</div>
-    </div>`;
-  }
-
-  // 凡例
-  const legendItems=relTypes.map(t=>`<div class="graph-legend-item"><div class="graph-legend-line" style="background:${t.color}"></div>${esc(t.name)}</div>`).join('');
-
-  // ツールバー
-  let toolbar=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">`;
-  if(isEdit){
-    toolbar+=`<button class="btn btn-secondary btn-sm" id="graph-connect-btn" onclick="toggleGraphConnectMode()">${graphConnectMode?'✅ 接続中':'🔗 接続'}</button>`;
-    if(graphConnectMode&&graphConnectFrom){
-      toolbar+=`<span style="font-size:12px;color:var(--accent)">→ 相手を選択</span>`;
-    }
-    toolbar+=`<button class="btn btn-secondary btn-sm" onclick="openRelTypeModal()">凡例編集</button>`;
-  }
-  toolbar+=`<button class="btn btn-secondary btn-sm" onclick="changeGraphZoom(0.2)" style="width:36px">＋</button>`;
-  toolbar+=`<button class="btn btn-secondary btn-sm" onclick="changeGraphZoom(-0.2)" style="width:36px">－</button>`;
-  toolbar+=`<span style="font-size:11px;color:var(--text-2)" id="graph-zoom-label">${Math.round(graphZoom*100)}%</span>`;
-  toolbar+=`</div>`;
-
-  return `${toolbar}
-<div class="graph-container" id="graph-container"
-  ontouchstart="graphContainerTouchStart(event)"
-  ontouchmove="graphContainerTouchMove(event)"
-  ontouchend="graphContainerTouchEnd(event)"
-  onmousemove="graphContainerMouseMove(event)"
-  onmouseup="graphContainerMouseUp(event)">
-  <div class="graph-canvas" id="graph-canvas" style="transform-origin:top left;transform:scale(${graphZoom})">
-    <svg class="graph-svg" id="graph-svg"><g id="graph-lines">${svgLines}</g></svg>
-    ${nodesHtml}
-  </div>
-  <div class="graph-legend">${legendItems}</div>
-</div>`;
-}
-
-function initGraphEvents(){
-  // マウスドラッグ用
-  document.addEventListener('mousemove',graphDocMouseMove,{passive:true});
-  document.addEventListener('mouseup',graphDocMouseUp,{passive:true});
-}
-
-function changeGraphZoom(delta){
-  graphZoom=Math.max(0.3,Math.min(2,+(graphZoom+delta).toFixed(1)));
-  const canvas=document.getElementById('graph-canvas');
-  if(canvas)canvas.style.transform=`scale(${graphZoom})`;
-  const lbl=document.getElementById('graph-zoom-label');
-  if(lbl)lbl.textContent=Math.round(graphZoom*100)+'%';
-}
-
-function toggleGraphConnectMode(){
-  graphConnectMode=!graphConnectMode;
-  graphConnectFrom=null;
-  refreshGraphView();
-}
-
-function refreshGraphView(){
-  const el=document.getElementById('graph-render-area');
-  if(!el||!currentMemo||!currentFormat)return;
-  const nodeMemos=Object.values(_cache.memos||{}).filter(m=>m.groupId===currentMemo.groupId&&m.id!==currentMemo.id&&(!_cache.formats||!_cache.formats[m.formatId]||(_cache.formats[m.formatId].type||'normal')==='normal'));
-  const isEdit=currentMode==='edit'&&!currentMemo.locked&&isAdmin;
-  el.innerHTML=renderGraphView(currentMemo,nodeMemos,isEdit);
-  initGraphEvents();
-}
-
-// ===== NODE DRAG (touch) =====
-function graphNodeTouchStart(e,memoId){
-  e.stopPropagation();
-  graphDragNodeId=memoId;
-  graphDragMoved=false;
-  const t=e.touches[0];
-  graphDragStartX=t.clientX;graphDragStartY=t.clientY;
-  const pos=getGraphNodes()[memoId]||{x:100,y:100};
-  graphDragNodeStartX=pos.x;graphDragNodeStartY=pos.y;
-}
-function graphContainerTouchStart(e){
-  if(!graphDragNodeId){}
-}
-function graphContainerTouchMove(e){
-  if(!graphDragNodeId)return;
-  const t=e.touches[0];
-  const dx=(t.clientX-graphDragStartX)/graphZoom;
-  const dy=(t.clientY-graphDragStartY)/graphZoom;
-  if(Math.abs(dx)>4||Math.abs(dy)>4)graphDragMoved=true;
-  if(!graphDragMoved)return;
-  const nx=Math.max(0,Math.min(GRAPH_W-NODE_W,graphDragNodeStartX+dx));
-  const ny=Math.max(0,Math.min(GRAPH_H-NODE_H,graphDragNodeStartY+dy));
-  const el=document.getElementById(`gnode-${graphDragNodeId}`);
-  if(el){el.style.left=nx+'px';el.style.top=ny+'px';}
-  if(!currentMemo.fieldValues)currentMemo.fieldValues={};
-  if(!currentMemo.fieldValues.graph)currentMemo.fieldValues.graph={};
-  if(!currentMemo.fieldValues.graph.nodes)currentMemo.fieldValues.graph.nodes={};
-  currentMemo.fieldValues.graph.nodes[graphDragNodeId]={x:Math.round(nx),y:Math.round(ny)};
-  updateGraphLines();
-}
-function graphContainerTouchEnd(e){
-  if(!graphDragNodeId)return;
-  if(!graphDragMoved){
-    graphNodeTap(graphDragNodeId);
-  }else{
-    fbPut('memos',currentMemo);
-  }
-  graphDragNodeId=null;
-}
-
-// ===== NODE DRAG (mouse) =====
-function graphNodeMouseDown(e,memoId){
-  e.preventDefault();
-  graphDragNodeId=memoId;graphDragMoved=false;
-  graphDragStartX=e.clientX;graphDragStartY=e.clientY;
-  const pos=getGraphNodes()[memoId]||{x:100,y:100};
-  graphDragNodeStartX=pos.x;graphDragNodeStartY=pos.y;
-}
-function graphContainerMouseMove(e){}
-function graphContainerMouseUp(e){}
-function graphDocMouseMove(e){
-  if(!graphDragNodeId)return;
-  const dx=(e.clientX-graphDragStartX)/graphZoom;
-  const dy=(e.clientY-graphDragStartY)/graphZoom;
-  if(Math.abs(dx)>4||Math.abs(dy)>4)graphDragMoved=true;
-  if(!graphDragMoved)return;
-  const nx=Math.max(0,Math.min(GRAPH_W-NODE_W,graphDragNodeStartX+dx));
-  const ny=Math.max(0,Math.min(GRAPH_H-NODE_H,graphDragNodeStartY+dy));
-  const el=document.getElementById(`gnode-${graphDragNodeId}`);
-  if(el){el.style.left=nx+'px';el.style.top=ny+'px';}
-  if(!currentMemo.fieldValues?.graph?.nodes)return;
-  currentMemo.fieldValues.graph.nodes[graphDragNodeId]={x:Math.round(nx),y:Math.round(ny)};
-  updateGraphLines();
-}
-function graphDocMouseUp(e){
-  if(!graphDragNodeId)return;
-  if(!graphDragMoved)graphNodeTap(graphDragNodeId);
-  else fbPut('memos',currentMemo);
-  graphDragNodeId=null;
-}
-
-function updateGraphLines(){
-  const g=document.getElementById('graph-lines');
-  if(!g)return;
-  const edges=getGraphEdges();
-  const nodes=getGraphNodes();
-  const relTypeMap=getRelTypeMap();
-  let html='';
-  for(const [eid,edge] of Object.entries(edges)){
-    const fp=nodes[edge.from]||{x:0,y:0};
-    const tp=nodes[edge.to]||{x:0,y:0};
-    const color=relTypeMap[edge.typeId]?.color||'#7c6af5';
-    const x1=fp.x+NODE_W/2,y1=fp.y+32,x2=tp.x+NODE_W/2,y2=tp.y+32;
-    html+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`;
-    html+=`<line class="edge-tap" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="24" onclick="openEdgeView('${eid}')"/>`;
-  }
-  g.innerHTML=html;
-}
-
-// ===== NODE TAP =====
-function graphNodeTap(memoId){
-  if(graphConnectMode){
-    if(!graphConnectFrom){
-      graphConnectFrom=memoId;
-      // ノードをハイライト
-      const el=document.querySelector(`#gnode-${memoId} .graph-node-img`);
-      if(el)el.style.borderColor='var(--accent)';
-      refreshGraphView();
-    }else if(graphConnectFrom!==memoId){
-      // エッジ作成モーダルを開く
-      openEdgeCreate(graphConnectFrom,memoId);
-      graphConnectMode=false;graphConnectFrom=null;
-    }
-  }
-}
-
-// ===== EDGE CREATE =====
-function openEdgeCreate(fromId,toId){
-  editingEdgeId=null;
-  selectedEdgeTypeId=getRelationTypes()[0]?.id||'rt1';
-  const fromMemo=allMemos.find(m=>m.id===fromId);
-  const toMemo=allMemos.find(m=>m.id===toId);
-  document.getElementById('graph-edge-title').textContent=`${fromMemo?.title||fromId} ↔ ${toMemo?.title||toId}`;
-  document.getElementById('graph-edge-view-area').style.display='none';
-  document.getElementById('graph-edge-edit-area').style.display='block';
-  document.getElementById('graph-edge-physical').value='';
-  document.getElementById('graph-edge-mental').value='';
-  document.getElementById('graph-edge-compat').value='';
-  renderEdgeTypePicker();
-  document.getElementById('graph-edge-footer').innerHTML=`
-    <button class="btn btn-secondary flex-1" onclick="closeModal('modal-graph-edge')">キャンセル</button>
-    <button class="btn btn-primary flex-1" onclick="saveEdge('${fromId}','${toId}')">保存</button>`;
-  openModal('modal-graph-edge');
-}
-
-function openEdgeView(edgeId){
-  editingEdgeId=edgeId;
-  const edge=getGraphEdges()[edgeId];
-  if(!edge)return;
-  const relTypeMap=getRelTypeMap();
-  const type=relTypeMap[edge.typeId];
-  const fromMemo=allMemos.find(m=>m.id===edge.from);
-  const toMemo=allMemos.find(m=>m.id===edge.to);
-  document.getElementById('graph-edge-title').textContent=`${fromMemo?.title||edge.from} ↔ ${toMemo?.title||edge.to}`;
-
-  if(isAdmin){
-    selectedEdgeTypeId=edge.typeId||getRelationTypes()[0]?.id;
-    document.getElementById('graph-edge-view-area').style.display='none';
-    document.getElementById('graph-edge-edit-area').style.display='block';
-    document.getElementById('graph-edge-physical').value=edge.physical||'';
-    document.getElementById('graph-edge-mental').value=edge.mental||'';
-    document.getElementById('graph-edge-compat').value=edge.compatibility||'';
-    renderEdgeTypePicker();
-    document.getElementById('graph-edge-footer').innerHTML=`
-      <button class="btn btn-secondary flex-1" style="color:var(--danger)" onclick="deleteEdge('${edgeId}')">削除</button>
-      <button class="btn btn-primary flex-1" onclick="updateEdge('${edgeId}')">保存</button>`;
-  } else {
-    // 閲覧者
-    const typeLabel=type?`<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:12px;height:12px;border-radius:50%;background:${type.color};display:inline-block"></span>${esc(type.name)}</span>`:'';
-    document.getElementById('graph-edge-view-area').innerHTML=`
-      <div style="margin-bottom:12px">${typeLabel}</div>
-      ${edge.physical?`<div class="field-group"><div class="field-label">物理的関係</div><div style="font-size:13px;color:var(--text-0);line-height:1.7;white-space:pre-wrap">${esc(edge.physical)}</div></div>`:''}
-      ${edge.mental?`<div class="field-group"><div class="field-label">精神的関係</div><div style="font-size:13px;color:var(--text-0);line-height:1.7;white-space:pre-wrap">${esc(edge.mental)}</div></div>`:''}
-      ${edge.compatibility?`<div class="field-group"><div class="field-label">性格の相性</div><div style="font-size:13px;color:var(--text-0);line-height:1.7;white-space:pre-wrap">${esc(edge.compatibility)}</div></div>`:''}`;
-    document.getElementById('graph-edge-view-area').style.display='block';
-    document.getElementById('graph-edge-edit-area').style.display='none';
-    document.getElementById('graph-edge-footer').innerHTML=`<button class="btn btn-primary btn-full" onclick="closeModal('modal-graph-edge')">閉じる</button>`;
-  }
-  openModal('modal-graph-edge');
-}
-
-function renderEdgeTypePicker(){
-  const types=getRelationTypes();
-  document.getElementById('graph-edge-type-picker').innerHTML=types.map(t=>`
-    <div onclick="selectEdgeType('${t.id}')" id="etype-${t.id}" style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:20px;border:2px solid ${t.id===selectedEdgeTypeId?t.color:'var(--border)'};background:${t.id===selectedEdgeTypeId?'rgba('+hexToRgb(t.color)+',0.15)':'var(--bg-3)'};cursor:pointer">
-      <div style="width:10px;height:10px;border-radius:50%;background:${t.color}"></div>
-      <span style="font-size:12px">${esc(t.name)}</span>
-    </div>`).join('');
-}
-
-function hexToRgb(hex){
-  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-  return `${r},${g},${b}`;
-}
-
-function selectEdgeType(id){
-  selectedEdgeTypeId=id;
-  renderEdgeTypePicker();
-}
-
-function saveEdge(fromId,toId){
-  if(!currentMemo)return;
-  if(!currentMemo.fieldValues)currentMemo.fieldValues={};
-  if(!currentMemo.fieldValues.graph)currentMemo.fieldValues.graph={};
-  if(!currentMemo.fieldValues.graph.edges)currentMemo.fieldValues.graph.edges={};
-  const eid='edge_'+uuid();
-  currentMemo.fieldValues.graph.edges[eid]={
-    from:fromId,to:toId,
-    typeId:selectedEdgeTypeId,
-    physical:document.getElementById('graph-edge-physical').value.trim(),
-    mental:document.getElementById('graph-edge-mental').value.trim(),
-    compatibility:document.getElementById('graph-edge-compat').value.trim()
-  };
-  fbPut('memos',currentMemo);
-  closeModal('modal-graph-edge');
-  refreshGraphView();
-}
-
-function updateEdge(edgeId){
-  if(!currentMemo?.fieldValues?.graph?.edges)return;
-  const edge=currentMemo.fieldValues.graph.edges[edgeId];
-  if(!edge)return;
-  currentMemo.fieldValues.graph.edges[edgeId]={
-    ...edge,
-    typeId:selectedEdgeTypeId,
-    physical:document.getElementById('graph-edge-physical').value.trim(),
-    mental:document.getElementById('graph-edge-mental').value.trim(),
-    compatibility:document.getElementById('graph-edge-compat').value.trim()
-  };
-  fbPut('memos',currentMemo);
-  closeModal('modal-graph-edge');
-  refreshGraphView();
-}
-
-function deleteEdge(edgeId){
-  if(!currentMemo?.fieldValues?.graph?.edges)return;
-  delete currentMemo.fieldValues.graph.edges[edgeId];
-  fbPut('memos',currentMemo);
-  closeModal('modal-graph-edge');
-  refreshGraphView();
-}
-
-// ===== RELATION TYPE MANAGEMENT =====
-function openRelTypeModal(){
-  pendingRelationTypes=JSON.parse(JSON.stringify(getRelationTypes()));
-  renderRelTypeList();
-  openModal('modal-graph-reltype');
-}
-
-function renderRelTypeList(){
-  document.getElementById('graph-reltype-list').innerHTML=pendingRelationTypes.map((t,i)=>`
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <input type="color" value="${t.color}" oninput="pendingRelationTypes[${i}].color=this.value;renderRelTypeList()" style="width:36px;height:36px;border:none;padding:0;cursor:pointer;background:none">
-      <input class="field-input" value="${esc(t.name)}" oninput="pendingRelationTypes[${i}].name=this.value" style="flex:1">
-      <button class="btn-icon" style="color:var(--danger);width:30px;height:30px" onclick="pendingRelationTypes.splice(${i},1);renderRelTypeList()">✕</button>
-    </div>`).join('');
-}
-
-function addRelationType(){
-  const colors=['#7c6af5','#4ec994','#e05580','#e05555','#6a6a88','#f5a623','#50c8fa'];
-  const color=colors[pendingRelationTypes.length%colors.length];
-  pendingRelationTypes.push({id:'rt_'+Date.now(),name:'新しい関係',color});
-  renderRelTypeList();
-}
-
-function saveRelationTypes(){
-  if(!currentMemo)return;
-  if(!currentMemo.fieldValues)currentMemo.fieldValues={};
-  if(!currentMemo.fieldValues.graph)currentMemo.fieldValues.graph={};
-  currentMemo.fieldValues.graph.relationTypes=pendingRelationTypes;
-  fbPut('memos',currentMemo);
-  closeModal('modal-graph-reltype');
-  refreshGraphView();
-}
 
 // ===== BACKUP =====
 function openBackupModal(){openModal('modal-backup');}
