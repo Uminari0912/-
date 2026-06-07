@@ -1274,7 +1274,8 @@ function renderMemoDetail(){
 
   // 関係図型フォーマット
   if(fmt.type==='graph'){
-    const graphMemos=allMemos.filter(mm=>mm.groupId===m.groupId&&mm.id!==m.id);
+    // キャッシュから同グループのメモを全取得（allMemosは現グループのみなので）
+    const graphMemos=Object.values(_cache.memos||{}).filter(mm=>mm.groupId===m.groupId&&mm.id!==m.id&&(!_cache.formats||!_cache.formats[mm.formatId]||(_cache.formats[mm.formatId].type||'normal')==='normal'));
     let ghtml=`<div style="padding:12px">`;
     if(isEdit){
       ghtml+=`<input class="field-input" style="font-size:20px;font-weight:700;margin-bottom:12px" value="${esc(m.title||'')}" placeholder="タイトル" oninput="currentMemo.title=this.value;onMemoChange()">`;
@@ -3140,7 +3141,7 @@ function toggleGraphConnectMode(){
 function refreshGraphView(){
   const el=document.getElementById('graph-render-area');
   if(!el||!currentMemo||!currentFormat)return;
-  const nodeMemos=allMemos.filter(m=>m.groupId===currentMemo.groupId&&m.id!==currentMemo.id);
+  const nodeMemos=Object.values(_cache.memos||{}).filter(m=>m.groupId===currentMemo.groupId&&m.id!==currentMemo.id&&(!_cache.formats||!_cache.formats[m.formatId]||(_cache.formats[m.formatId].type||'normal')==='normal'));
   const isEdit=currentMode==='edit'&&!currentMemo.locked&&isAdmin;
   el.innerHTML=renderGraphView(currentMemo,nodeMemos,isEdit);
   initGraphEvents();
