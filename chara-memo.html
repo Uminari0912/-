@@ -2647,24 +2647,41 @@ let editingMapCellColor = '';
 let mapSelectMode = false;
 let mapSelectedKeys = new Set();
 let mapZoom = 1;
-let mapPinchDist0 = 0;
-let mapZoom0 = 1;
+let editingRegionId = null; // 編集中の地域ID
+
+function getMapData(){ return currentMemo?.fieldValues?.map||{}; }
+function getRegions(){ return getMapData().regions||{}; }
+function getCellRegionMap(){
+  // cellKey -> regionId のマップを作成
+  const map={};
+  const regions=getRegions();
+  for(const [rid,region] of Object.entries(regions)){
+    for(const key of (region.keys||[])) map[key]=rid;
+  }
+  return map;
+}
 
 function refreshMapView(){
   const mapEl=document.getElementById('map-render-area');
   if(mapEl&&currentFormat&&currentMemo)
-    mapEl.innerHTML=renderMapView(currentFormat,currentMemo.fieldValues?.map||{},currentMode==='edit'&&!currentMemo.locked&&isAdmin);
+    mapEl.innerHTML=renderMapView(currentFormat,getMapData(),currentMode==='edit'&&!currentMemo.locked&&isAdmin);
 }
 
 function renderMapView(fmt, memoData, isEdit){
   const cols=fmt.mapCols||20;
   const rows=fmt.mapRows||20;
   const cellSize=52;
+  const regions=memoData.regions||{};
+  const cellRegionMap={}; // key->regionId
+  for(const [rid,region] of Object.entries(regions)){
+    for(const key of (region.keys||[])) cellRegionMap[key]=rid;
+  }
+
   let html=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">`;
   if(isEdit){
     html+=`<button class="btn btn-secondary btn-sm" onclick="toggleMapSelectMode()">${mapSelectMode?'✅ 選択中':'☐ 選択'}</button>`;
     if(mapSelectMode&&mapSelectedKeys.size>0){
-      html+=`<button class="btn btn-primary btn-sm" onclick="openMapMultiEdit()">${mapSelectedKeys.size}マス編集</button>`;
+      html+=`<button class="btn btn-primary btn-sm" onclick="openMapMultiEdit()">${mapSelectedKeys.size}マスで地域作成</button>`;
       html+=`<button class="btn btn-secondary btn-sm" onclick="clearMapSelection()">解除</button>`;
     }
     html+=`<button class="btn btn-secondary btn-sm" onclick="openMapSizeModal()">サイズ</button>`;
@@ -2676,45 +2693,95 @@ function renderMapView(fmt, memoData, isEdit){
   html+=`<div class="map-scroll-area" id="map-scroll-area">`;
   html+=`<div class="map-zoom-wrap" id="map-zoom-wrap" style="transform:scale(${mapZoom});width:${cols*(cellSize+1)}px;height:${rows*(cellSize+1)}px">`;
   html+=`<div class="map-grid" style="grid-template-columns:repeat(${cols},${cellSize}px)">`;
+
+  // 各地域の「中心マス」を計算（最初のkey）
+  const regionCenterKey={};
+  for(const [rid,region] of Object.entries(regions)){
+    if(region.keys&&region.keys.length>0) regionCenterKey[rid]=region.keys[0];
+  }
+
   for(let r=0;r<rows;r++){
     for(let c=0;c<cols;c++){
       const key=`${r}_${c}`;
-      const cell=(memoData||{})[key]||{};
-      const isEmpty=!cell.emoji&&!cell.text;
+      const regionId=cellRegionMap[key];
+      const region=regionId?regions[regionId]:null;
       const isSelected=mapSelectedKeys.has(key);
-      const bg=cell.color?`background:${cell.color}`:'';
+      const isCenter=region&&regionCenterKey[regionId]===key;
+      const bg=region?.color?`background:${region.color}`:'';
       const selStyle=isSelected?'outline:2px solid var(--accent);outline-offset:-2px;':'';
-      const hasNote=!!(cell.note&&cell.note.trim());
+      const hasNote=!!(region?.note);
+      const isEmpty=!region;
+
       let clickAttr='';
       if(isEdit){
-        clickAttr=mapSelectMode
-          ?`onclick="toggleMapCellSelect('${key}')"`
-          :`onclick="openMapCellEdit('${key}')"`;
+        if(mapSelectMode){
+          clickAttr=`onclick="toggleMapCellSelect('${key}')"`;
+        } else if(region){
+          clickAttr=`onclick="openRegionEdit('${regionId}')"`;
+        } else {
+          clickAttr=''; // 空マスは選択モードのみ
+        }
       } else {
-        // 閲覧モード：説明があればポップアップ
-        if(hasNote||!isEmpty) clickAttr=`onclick="viewMapCell('${key}')"`;
+        if(region) clickAttr=`onclick="viewRegion('${regionId}')"`;
       }
+
       html+=`<div class="map-cell${isEmpty?' map-cell-empty':''}" style="${bg}${selStyle}" ${clickAttr}>
-        ${hasNote?'<div class="map-cell-note-dot"></div>':''}
-        <div class="map-cell-emoji">${cell.emoji||'·'}</div>
-        ${cell.text?`<div class="map-cell-text">${esc(cell.text)}</div>`:''}
+        ${hasNote&&isCenter?'<div class="map-cell-note-dot"></div>':''}
+        <div class="map-cell-emoji">${isCenter?(region.emoji||'·'):'·'}</div>
+        ${isCenter&&region.name?`<div class="map-cell-text">${esc(region.name)}</div>`:''}
       </div>`;
     }
   }
   html+=`</div></div></div>`;
+
+  // 地域一覧（編集モード）
+  if(isEdit&&Object.keys(regions).length>0){
+    html+=`<div style="margin-top:12px"><div style="font-size:11px;color:var(--text-2);margin-bottom:6px;letter-spacing:0.05em">地域一覧</div>`;
+    for(const [rid,region] of Object.entries(regions)){
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:${region.color||'var(--bg-3)'};border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px">
+        <span style="font-size:18px">${region.emoji||'📍'}</span>
+        <span style="flex:1;font-size:13px;font-weight:600;color:var(--text-0)">${esc(region.name||'名称未設定')}</span>
+        <span style="font-size:11px;color:var(--text-2)">${(region.keys||[]).length}マス</span>
+        <button class="btn-icon" style="width:28px;height:28px;font-size:12px" onclick="openRegionEdit('${rid}')">✏</button>
+        <button class="btn-icon" style="width:28px;height:28px;font-size:12px;color:var(--danger)" onclick="deleteRegion('${rid}')">✕</button>
+      </div>`;
+    }
+    html+=`</div>`;
+  }
   return html;
 }
 
-function viewMapCell(key){
-  const cell=(currentMemo.fieldValues?.map||{})[key]||{};
-  if(!cell.emoji&&!cell.text&&!cell.note)return;
-  const name=[cell.emoji,cell.text].filter(Boolean).join(' ')||'（名称未設定）';
-  const note=cell.note||'';
-  if(!note)return; // 説明なしは何もしない
-  // モーダル表示
+function viewRegion(regionId){
+  const region=getRegions()[regionId];
+  if(!region)return;
+  const name=[region.emoji,region.name].filter(Boolean).join(' ')||'（名称未設定）';
+  if(!region.note&&!region.name)return;
   document.getElementById('map-view-title').textContent=name;
-  document.getElementById('map-view-note').textContent=note;
+  document.getElementById('map-view-note').textContent=region.note||'（説明なし）';
   openModal('modal-map-view');
+}
+
+function openRegionEdit(regionId){
+  editingRegionId=regionId;
+  const region=getRegions()[regionId]||{};
+  editingMapCellColor=region.color||'';
+  document.getElementById('map-cell-emoji').value=region.emoji||'';
+  document.getElementById('map-cell-text').value=region.name||'';
+  document.getElementById('map-cell-note').value=region.note||'';
+  updateMapColorUI();
+  openModal('modal-map-cell');
+}
+
+function deleteRegion(regionId){
+  confirmDialog('地域を削除','この地域を削除しますか？（マスは空になります）','削除',()=>{
+    const mapData=getMapData();
+    if(!mapData.regions)return;
+    delete mapData.regions[regionId];
+    if(!currentMemo.fieldValues)currentMemo.fieldValues={};
+    currentMemo.fieldValues.map=mapData;
+    fbPut('memos',currentMemo);
+    refreshMapView();
+  });
 }
 
 function changeMapZoom(delta){
@@ -2750,22 +2817,14 @@ function toggleMapCellSelect(key){
 }
 
 function openMapCellEdit(key){
-  if(!isAdmin)return;
-  editingMapKey=key;
-  mapSelectedKeys.clear();
-  const cell=(currentMemo.fieldValues?.map||{})[key]||{};
-  editingMapCellColor=cell.color||'';
-  document.getElementById('map-cell-emoji').value=cell.emoji||'';
-  document.getElementById('map-cell-text').value=cell.text||'';
-  document.getElementById('map-cell-note').value=cell.note||'';
-  updateMapColorUI();
-  openModal('modal-map-cell');
-  setTimeout(()=>document.getElementById('map-cell-emoji').focus(),300);
+  // 単独マスタップは選択モードに誘導
+  mapSelectedKeys.add(key);
+  openMapMultiEdit();
 }
 
 function openMapMultiEdit(){
   if(!isAdmin||mapSelectedKeys.size===0)return;
-  editingMapKey=null;
+  editingRegionId=null;
   editingMapCellColor='';
   document.getElementById('map-cell-emoji').value='';
   document.getElementById('map-cell-text').value='';
@@ -2791,36 +2850,49 @@ function saveMapCell(){
   if(!currentMemo)return;
   if(!currentMemo.fieldValues)currentMemo.fieldValues={};
   if(!currentMemo.fieldValues.map)currentMemo.fieldValues.map={};
+  if(!currentMemo.fieldValues.map.regions)currentMemo.fieldValues.map.regions={};
+
   const emoji=document.getElementById('map-cell-emoji').value.trim();
-  const text=document.getElementById('map-cell-text').value.trim();
+  const name=document.getElementById('map-cell-text').value.trim();
   const note=document.getElementById('map-cell-note').value.trim();
-  const keys=mapSelectedKeys.size>0?[...mapSelectedKeys]:(editingMapKey?[editingMapKey]:[]);
-  for(const key of keys){
-    if(emoji||text||editingMapCellColor||note){
-      const existing=currentMemo.fieldValues.map[key]||{};
-      currentMemo.fieldValues.map[key]={
-        emoji:emoji||existing.emoji||'',
-        text:text||existing.text||'',
-        color:editingMapCellColor||existing.color||'',
-        note:note||existing.note||''
-      };
-    }
+
+  if(editingRegionId){
+    // 既存地域の編集
+    const region=currentMemo.fieldValues.map.regions[editingRegionId]||{};
+    currentMemo.fieldValues.map.regions[editingRegionId]={
+      ...region,
+      emoji,name,note,
+      color:editingMapCellColor||region.color||''
+    };
+  } else {
+    // 新規地域作成（選択マスから）
+    const keys=[...mapSelectedKeys];
+    if(!keys.length){closeModal('modal-map-cell');return;}
+    const rid='region_'+uuid();
+    currentMemo.fieldValues.map.regions[rid]={
+      emoji,name,note,
+      color:editingMapCellColor||'',
+      keys
+    };
   }
+
   mapSelectedKeys.clear();
   mapSelectMode=false;
+  editingRegionId=null;
   fbPut('memos',currentMemo);
   closeModal('modal-map-cell');
   refreshMapView();
 }
 
 function clearMapCell(){
-  if(!currentMemo)return;
-  const keys=mapSelectedKeys.size>0?[...mapSelectedKeys]:(editingMapKey?[editingMapKey]:[]);
-  if(!currentMemo.fieldValues?.map)return;
-  for(const key of keys)delete currentMemo.fieldValues.map[key];
+  if(!currentMemo||!editingRegionId)return;
+  if(currentMemo.fieldValues?.map?.regions){
+    delete currentMemo.fieldValues.map.regions[editingRegionId];
+    fbPut('memos',currentMemo);
+  }
+  editingRegionId=null;
   mapSelectedKeys.clear();
   mapSelectMode=false;
-  fbPut('memos',currentMemo);
   closeModal('modal-map-cell');
   refreshMapView();
 }
