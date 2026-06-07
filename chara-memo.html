@@ -2250,28 +2250,32 @@ function saveFieldEdit(){
 }
 async function saveFormat(){
   const name=document.getElementById('format-name-input').value.trim();if(!name){showToast('フォーマット名を入力してください');return;}
+  const ftype=document.getElementById('format-type-input').value||'normal';
   const sections=pendingSections.map((s,i)=>({...s,order:i,fields:s.fields.map((f,j)=>({...f,order:j}))}));
+  // undefinedを含まないオブジェクトを作成
+  const formatBase={name,sections,outputSets:pendingOutputSets,type:ftype,updatedAt:now()};
+  if(ftype==='map'){
+    formatBase.mapCols=parseInt(document.getElementById('map-cols-input').value)||20;
+    formatBase.mapRows=parseInt(document.getElementById('map-rows-input').value)||20;
+  }
   if(editingFormatId){
-    const fmt=await fbGet('formats',editingFormatId);fmt.name=name;fmt.sections=sections;fmt.outputSets=pendingOutputSets;
-    const ftype=document.getElementById('format-type-input').value||'normal';
-    fmt.type=ftype;
-    if(ftype==='map'){fmt.mapCols=parseInt(document.getElementById('map-cols-input').value)||20;fmt.mapRows=parseInt(document.getElementById('map-rows-input').value)||20;}
-    fmt.updatedAt=now();
-    await fbPut('formats',fmt);
+    const fmt=await fbGet('formats',editingFormatId);
+    const updated={...fmt,...formatBase};
+    await fbPut('formats',updated);
     const memos=await fbGetAll('memos');
     for(const memo of memos.filter(m=>m.formatId===editingFormatId)){
-      const newVals={};
-      for(const sec of sections)for(const f of sec.fields){
-        const key=`${sec.sectionId}_${f.fieldId}`;
-        newVals[key]=memo.fieldValues[key]!==undefined?memo.fieldValues[key]:(f.type==='text'?(f.template||''):[]);
+      if(ftype==='normal'){
+        const newVals={};
+        for(const sec of sections)for(const f of sec.fields){
+          const key=`${sec.sectionId}_${f.fieldId}`;
+          newVals[key]=memo.fieldValues[key]!==undefined?memo.fieldValues[key]:(f.type==='text'?(f.template||''):[]);
+        }
+        memo.fieldValues=newVals;
       }
-      memo.fieldValues=newVals;memo.updatedAt=now();await fbPut('memos',memo);
+      memo.updatedAt=now();await fbPut('memos',memo);
     }
   }else{
-    const ftype=document.getElementById('format-type-input').value||'normal';
-    const mapCols=ftype==='map'?parseInt(document.getElementById('map-cols-input').value)||20:undefined;
-    const mapRows=ftype==='map'?parseInt(document.getElementById('map-rows-input').value)||20:undefined;
-    await fbPut('formats',{id:uuid(),name,sections,outputSets:pendingOutputSets,type:ftype,mapCols,mapRows,createdAt:now(),updatedAt:now()});
+    await fbPut('formats',{id:uuid(),...formatBase,createdAt:now()});
   }
   closeModal('modal-format');loadFormats();showToast('保存しました');
 }
