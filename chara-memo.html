@@ -932,8 +932,8 @@ function renderMemoList(memos){
       :`<div class="memo-card-cover"><span class="memo-card-cover-placeholder">👤</span></div>`;
     const editActions=currentMode==='edit'?`
       <div class="memo-card-actions">
-        <button class="btn-icon" style="width:28px;height:28px;font-size:12px${i===0?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveMemo(${i},-1)" title="上へ">↑</button>
-        <button class="btn-icon" style="width:28px;height:28px;font-size:12px${i===allMemos.length-1?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveMemo(${i},1)" title="下へ">↓</button>
+        <button class="btn-icon" style="width:28px;height:28px;font-size:12px${i===0||m.locked?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveMemo(${i},-1)" title="上へ">↑</button>
+        <button class="btn-icon" style="width:28px;height:28px;font-size:12px${i===allMemos.length-1||m.locked?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveMemo(${i},1)" title="下へ">↓</button>
         <button class="btn-icon" style="width:28px;height:28px;font-size:12px" onclick="event.stopPropagation();toggleMemoLock('${m.id}')" title="${m.locked?'ロック解除':'ロック'}">${m.locked?'🔒':'🔓'}</button>
         <button class="btn-icon" style="width:28px;height:28px;font-size:12px" onclick="event.stopPropagation();duplicateMemo('${m.id}')" title="複製">⧉</button>
         <button class="btn-icon" style="width:28px;height:28px;font-size:12px;color:var(--danger)${m.locked?';opacity:0.3;pointer-events:none':''}" onclick="event.stopPropagation();deleteMemo('${m.id}')">✕</button>
