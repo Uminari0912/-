@@ -371,7 +371,7 @@ body.viewer-mode .image-thumb {
 <!-- MEMO DETAIL -->
 <div id="screen-memo-detail" class="screen">
   <div class="header">
-    <button class="btn-icon" onclick="showScreen('screen-memos')">←</button>
+    <button class="btn-icon" onclick="showScreen(memoReturnScreen)">←</button>
     <span class="header-title">メモ</span>
     <span class="autosave" id="autosave-indicator"><span class="autosave-dot"></span><span id="autosave-text">—</span></span>
     <button class="btn-icon" id="undo-btn" onclick="undoMemo()" title="元に戻す" style="opacity:0.3;font-size:16px">↩</button>
@@ -723,6 +723,7 @@ const txs=(s,m='readonly')=>db.transaction(s,m).objectStore(s);
 
 // ===== STATE =====
 let currentGroupId=null,currentMemoId=null,currentMode='view';
+let memoReturnScreen='screen-memos'; // メモから戻る先の画面
 // メモリキャッシュ（Firebaseの代わりにメモリから読む）
 let _cache = {groups:{}, formats:{}, memos:{}, folders:{}};
 let _cacheLoaded = false;
@@ -1187,6 +1188,13 @@ async function createMemo(){
 
 // ===== MEMO DETAIL =====
 async function openMemo(memoId){
+  // 現在の画面を戻り先として記録
+  const screens=['screen-folder','screen-memos'];
+  for(const s of screens){
+    if(document.getElementById(s)?.classList.contains('active')){
+      memoReturnScreen=s;break;
+    }
+  }
   updateAutosave('読み込み中...');
   try{
     const prevMemoId=currentMemoId;
@@ -2786,8 +2794,8 @@ function loadFolderScreen(folderId){
 function renderFolderMemoCard(m,i,total){
   const fmt=_cache.formats?.[m.formatId];
   const effectiveTags=getEffectiveTags(m);
-  const tags=effectiveTags.slice(0,3).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
-  const more=effectiveTags.length>3?`<span style="font-size:11px;color:var(--text-2)">+${effectiveTags.length-3}</span>`:'';
+  const tags=effectiveTags.slice(0,3).map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('');
+  const more=effectiveTags.length>3?`<span class="tag-chip">+${effectiveTags.length-3}</span>`:'';
   const coverHtml=m.coverImage
     ?`<div class="memo-card-cover"><img src="${m.coverImage}" alt=""></div>`
     :`<div class="memo-card-cover"><span class="memo-card-cover-placeholder">👤</span></div>`;
