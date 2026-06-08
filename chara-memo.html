@@ -1014,8 +1014,8 @@ function renderMemoList(memos){
     return;
   }
   html+=memos.map((m,i)=>{
-    const tags=(m.tags||[]).slice(0,3).map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('');
-    const more=(m.tags||[]).length>3?`<span class="tag-chip">+${m.tags.length-3}</span>`:'';
+    const tags=(m.tags||[]).slice(0,5).map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('');
+    const more=(m.tags||[]).length>5?`<span class="tag-chip">+${m.tags.length-5}</span>`:'';
     const coverHtml=m.coverImage
       ?`<div class="memo-card-cover"><img src="${m.coverImage}" alt=""></div>`
       :`<div class="memo-card-cover"><span class="memo-card-cover-placeholder">👤</span></div>`;
@@ -1063,7 +1063,38 @@ function renderMemoList(memos){
 function filterMemos(){
   const q=document.getElementById('search-input').value.trim().toLowerCase();
   if(!q){renderMemoList(allMemos);return;}
-  renderMemoList(allMemos.filter(m=>(m.title||'').toLowerCase().includes(q)||m.id.toLowerCase().includes(q)||(m.tags||[]).some(t=>t.toLowerCase().includes(q))));
+  // 検索時はフォルダ内メモも含めてグループ全体から検索
+  const allGroupMemos=Object.values(_cache.memos||{}).filter(m=>m.groupId===currentGroupId);
+  const filtered=allGroupMemos.filter(m=>{
+    const effectiveTags=getEffectiveTags(m);
+    return (m.title||'').toLowerCase().includes(q)
+      ||m.id.toLowerCase().includes(q)
+      ||effectiveTags.some(t=>t.toLowerCase().includes(q));
+  });
+  // 検索時はフォルダカード非表示でフラット表示
+  renderMemoListFlat(filtered);
+}
+
+function renderMemoListFlat(memos){
+  const el=document.getElementById('memo-list');
+  if(!memos.length){el.innerHTML=`<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">該当するメモがありません</div></div>`;return;}
+  el.innerHTML=memos.map((m,i)=>{
+    const effectiveTags=getEffectiveTags(m);
+    const tags=effectiveTags.slice(0,5).map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('');
+    const more=effectiveTags.length>5?`<span class="tag-chip">+${effectiveTags.length-5}</span>`:'';
+    const coverHtml=m.coverImage
+      ?`<div class="memo-card-cover"><img src="${m.coverImage}" alt=""></div>`
+      :`<div class="memo-card-cover"><span class="memo-card-cover-placeholder">👤</span></div>`;
+    const folderName=m.folderId&&_cache.folders?.[m.folderId]?`<span style="font-size:10px;color:var(--text-2)">📁 ${esc(_cache.folders[m.folderId].name)}</span>`:'';
+    return `<div class="memo-card" onclick="openMemo('${m.id}')">
+      ${coverHtml}
+      <div class="memo-card-body">
+        <div class="card-title">${esc(m.title||'（名称未設定）')}</div>
+        <div class="card-sub">${esc(m.id)} ${folderName}</div>
+        ${tags||more?`<div class="card-tags">${tags}${more}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
 }
 function setMode(mode){
   if(mode==='edit'&&!isAdmin){showToast('編集権限がありません');return;}
@@ -2794,8 +2825,8 @@ function loadFolderScreen(folderId){
 function renderFolderMemoCard(m,i,total){
   const fmt=_cache.formats?.[m.formatId];
   const effectiveTags=getEffectiveTags(m);
-  const tags=effectiveTags.slice(0,3).map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('');
-  const more=effectiveTags.length>3?`<span class="tag-chip">+${effectiveTags.length-3}</span>`:'';
+  const tags=effectiveTags.slice(0,5).map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('');
+  const more=effectiveTags.length>5?`<span class="tag-chip">+${effectiveTags.length-5}</span>`:'';
   const coverHtml=m.coverImage
     ?`<div class="memo-card-cover"><img src="${m.coverImage}" alt=""></div>`
     :`<div class="memo-card-cover"><span class="memo-card-cover-placeholder">👤</span></div>`;
