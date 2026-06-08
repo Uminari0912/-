@@ -357,6 +357,10 @@ body.viewer-mode .image-thumb {
     <span class="header-title" id="folder-screen-title">フォルダ</span>
     <button class="btn-icon" id="btn-folder-lock" onclick="toggleFolderLock()" title="フォルダをロック">🔓</button>
     <button class="btn-icon" id="btn-folder-edit" onclick="openFolderEditModal()" title="編集">✏</button>
+    <div class="mode-toggle" id="folder-mode-toggle">
+      <button class="mode-btn active" id="folder-mode-btn-view" onclick="setFolderMode('view')">閲覧</button>
+      <button class="mode-btn" id="folder-mode-btn-edit" onclick="setFolderMode('edit')">編集</button>
+    </div>
   </div>
   <div class="scroll-area" id="folder-memo-list"></div>
   <div id="folder-add-bar" class="bottom-bar" style="display:none">
@@ -2207,13 +2211,15 @@ async function toggleMemoLock(memoId){
     confirmDialog('ロック解除','このメモのロックを解除しますか？','解除',async()=>{
       m.locked=false;await fbPut('memos',m);
       if(currentMemoId===memoId){currentMemo.locked=false;renderMemoDetail();}
-      loadMemos();showToast('ロック解除しました');
+      if(currentFolderId&&document.getElementById('screen-folder').classList.contains('active'))loadFolderScreen(currentFolderId);
+      else loadMemos();showToast('ロック解除しました');
     });
   }else{
     confirmDialog('メモをロック','ロックすると編集できなくなります。','ロック',async()=>{
       m.locked=true;await fbPut('memos',m);
       if(currentMemoId===memoId){currentMemo.locked=true;renderMemoDetail();}
-      loadMemos();showToast('ロックしました');
+      if(currentFolderId&&document.getElementById('screen-folder').classList.contains('active'))loadFolderScreen(currentFolderId);
+      else loadMemos();showToast('ロックしました');
     });
   }
 }
@@ -2616,8 +2622,18 @@ function setFormatType(type){
 
 // ===== FOLDERS =====
 let currentFolderId = null;
+let folderMode = 'view'; // フォルダ詳細画面のモード
 let pendingFolderTags = [];
 let editingFolderId = null;
+
+function setFolderMode(mode){
+  if(mode==='edit'&&!isAdmin){showToast('編集権限がありません');return;}
+  folderMode=mode;
+  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',mode==='view');
+  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',mode==='edit');
+  document.getElementById('folder-add-bar').style.display=isAdmin&&mode==='edit'?'flex':'none';
+  loadFolderScreen(currentFolderId);
+}
 
 function getFoldersByGroup(groupId){
   return Object.values(_cache.folders||{}).filter(f=>f.groupId===groupId).sort((a,b)=>(a.order??0)-(b.order??0));
@@ -2683,6 +2699,7 @@ function renderFolderTagsPreview(){
 async function saveFolder(){
   const name=document.getElementById('folder-name-input').value.trim();
   if(!name){showToast('フォルダ名を入力してください');return;}
+  if(editingFolderId&&_cache.folders?.[editingFolderId]?.locked){showToast('フォルダがロックされています');return;}
   if(editingFolderId){
     const folder={..._cache.folders[editingFolderId],name,autoTags:pendingFolderTags,updatedAt:now()};
     _cache.folders[editingFolderId]=folder;
@@ -2722,6 +2739,7 @@ function deleteFolderConfirm(){
 // フォルダ詳細画面
 async function openFolder(folderId){
   currentFolderId=folderId;
+  folderMode='view';
   loadFolderScreen(folderId);
   showScreen('screen-folder');
 }
@@ -2730,13 +2748,19 @@ function loadFolderScreen(folderId){
   const folder=_cache.folders?.[folderId];
   if(!folder)return;
   document.getElementById('folder-screen-title').textContent=folder.name||'フォルダ';
-  document.getElementById('btn-folder-edit').style.display=isAdmin?'flex':'none';
-  document.getElementById('folder-add-bar').style.display=isAdmin&&currentMode==='edit'?'flex':'none';
+  const folderIsLocked=folder.locked;
+  document.getElementById('btn-folder-edit').style.display=isAdmin&&!folderIsLocked?'flex':'none';
+  document.getElementById('folder-add-bar').style.display=isAdmin&&folderMode==='edit'&&!folderIsLocked?'flex':'none';
+  // モードトグル表示
+  const modeToggle=document.getElementById('folder-mode-toggle');
+  if(modeToggle)modeToggle.style.display=isAdmin?'flex':'none';
+  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',folderMode==='view');
+  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',folderMode==='edit');
   const lockBtn=document.getElementById('btn-folder-lock');
   if(lockBtn){
     lockBtn.style.display=isAdmin?'flex':'none';
-    lockBtn.textContent=folder.locked?'🔒':'🔓';
-    lockBtn.title=folder.locked?'フォルダのロックを解除':'フォルダをロック';
+    lockBtn.textContent=folderIsLocked?'🔒':'🔓';
+    lockBtn.title=folderIsLocked?'フォルダのロックを解除':'フォルダをロック';
   }
 
   const memos=getMemosByFolder(folderId);
@@ -2780,14 +2804,18 @@ function renderFolderMemoCard(m,i,total){
     if(totalEmpty>0)emptyBadgeHtml=`<span style="font-size:10px;background:rgba(224,148,64,0.2);color:var(--warning);border:1px solid rgba(224,148,64,0.4);padding:1px 7px;border-radius:10px;margin-left:6px">未設定 ${totalEmpty}</span>`;
   }
 
-  const editActions=currentMode==='edit'?`
+  const folderLocked=_cache.folders?.[currentFolderId]?.locked;
+  const isEditMode=folderMode==='edit'&&isAdmin;
+  const upDisabled=i===0||m.locked||folderLocked;
+  const downDisabled=i===total-1||m.locked||folderLocked;
+  const editActions=isEditMode?`
     <div class="memo-card-actions">
-      <button class="btn-icon" style="width:28px;height:28px;font-size:12px${i===0||m.locked?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveFolderMemo('${m.id}',-1)">↑</button>
-      <button class="btn-icon" style="width:28px;height:28px;font-size:12px${i===total-1||m.locked?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveFolderMemo('${m.id}',1)">↓</button>
+      <button class="btn-icon" style="width:28px;height:28px;font-size:12px${upDisabled?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveFolderMemo('${m.id}',-1)">↑</button>
+      <button class="btn-icon" style="width:28px;height:28px;font-size:12px${downDisabled?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveFolderMemo('${m.id}',1)">↓</button>
+      <button class="btn-icon" style="width:28px;height:28px;font-size:12px" onclick="event.stopPropagation();openMoveFolderModal('${m.id}')">📁</button>
       <button class="btn-icon" style="width:28px;height:28px;font-size:12px" onclick="event.stopPropagation();toggleMemoLock('${m.id}')">${m.locked?'🔒':'🔓'}</button>
       <button class="btn-icon" style="width:28px;height:28px;font-size:12px;color:var(--danger)${m.locked?';opacity:0.3;pointer-events:none':''}" onclick="event.stopPropagation();deleteMemo('${m.id}')">✕</button>
     </div>`:'';
-
   return `<div class="memo-card" onclick="openMemo('${m.id}')">
     ${coverHtml}
     <div class="memo-card-body">
@@ -2813,29 +2841,35 @@ async function moveFolderMemo(memoId, dir){
 }
 
 
-// ===== フォルダロック =====
+// ===== フォルダ専用モード =====
+
+function setFolderMode(mode){
+  if(mode==='edit'&&!isAdmin)return;
+  folderMode=mode;
+  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',mode==='view');
+  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',mode==='edit');
+  document.getElementById('folder-add-bar').style.display=isAdmin&&mode==='edit'?'flex':'none';
+  loadFolderScreen(currentFolderId);
+}
+
+// ===== フォルダロック（フォルダ設定のロック）=====
 async function toggleFolderLock(){
   const folder=_cache.folders?.[currentFolderId];
   if(!folder)return;
   const newLocked=!folder.locked;
   confirmDialog(
     newLocked?'フォルダをロック':'フォルダのロックを解除',
-    newLocked?'フォルダ内の全メモをロックします。':'フォルダ内の全メモのロックを解除します。',
+    newLocked
+      ?'ロックするとフォルダ名・タグ・メモの並び順を変更できなくなります。'
+      :'フォルダのロックを解除しますか？',
     newLocked?'ロック':'解除',
     async()=>{
       folder.locked=newLocked;
       folder.updatedAt=now();
       _cache.folders[folder.id]=folder;
       await fbPut('folders',folder);
-      // フォルダ内メモも全部ロック/解除
-      const memos=getMemosByFolder(currentFolderId);
-      for(const m of memos){
-        m.locked=newLocked;m.updatedAt=now();
-        _cache.memos[m.id]=m;
-        await fbPut('memos',m);
-      }
       loadFolderScreen(currentFolderId);
-      showToast(newLocked?'ロックしました':'ロック解除しました');
+      showToast(newLocked?'フォルダをロックしました':'ロック解除しました');
     }
   );
 }
@@ -2887,6 +2921,16 @@ async function moveMemoToFolder(folderId){
   }
   loadMemos();
   showToast(folderId?'フォルダに移動しました':'フォルダから外しました');
+}
+
+async function deleteMemoInFolder(memoId){
+  const m=_cache.memos?.[memoId];
+  confirmDialog('メモを削除',`「${m?.title||memoId}」を削除しますか？この操作は取り消せません。`,'削除',async()=>{
+    delete _cache.memos[memoId];
+    await fbDelete('memos',memoId);
+    loadFolderScreen(currentFolderId);
+    showToast('削除しました');
+  });
 }
 
 function openNewMemoModalInFolder(){
