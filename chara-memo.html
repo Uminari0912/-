@@ -1099,8 +1099,12 @@ function renderMemoListFlat(memos){
 function setMode(mode){
   if(mode==='edit'&&!isAdmin){showToast('編集権限がありません');return;}
   currentMode=mode;
-  folderMode=mode; // フォルダモードも同期
-  updateModeUI();renderMemoList(allMemos);
+  updateModeUI();
+  // フォルダモードトグルも更新
+  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',mode==='view');
+  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',mode==='edit');
+  // メモ一覧画面にいる場合のみ再描画
+  if(document.getElementById('screen-memos')?.classList.contains('active'))renderMemoList(allMemos);
 }
 function updateModeUI(){
   document.getElementById('mode-btn-view').classList.toggle('active',currentMode==='view');
@@ -1227,7 +1231,7 @@ async function openMemo(memoId){
     if(document.getElementById(s)?.classList.contains('active')){
       memoReturnScreen=s;
       // フォルダ画面から開く場合はfolderModeを使う
-      if(s==='screen-folder') currentMode=folderMode;
+      // currentModeはすでに同期済み
       break;
     }
   }
@@ -2671,12 +2675,7 @@ let pendingFolderTags = [];
 let editingFolderId = null;
 
 function setFolderMode(mode){
-  if(mode==='edit'&&!isAdmin){showToast('編集権限がありません');return;}
-  folderMode=mode;
-  currentMode=mode; // グローバルモードも同期
-  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',mode==='view');
-  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',mode==='edit');
-  document.getElementById('folder-add-bar').style.display=isAdmin&&mode==='edit'&&!(_cache.folders?.[currentFolderId]?.locked)?'flex':'none';
+  setMode(mode); // currentModeを更新して全UI同期
   loadFolderScreen(currentFolderId);
 }
 
@@ -2784,7 +2783,6 @@ function deleteFolderConfirm(){
 // フォルダ詳細画面
 async function openFolder(folderId){
   currentFolderId=folderId;
-  folderMode=currentMode; // メモ一覧のモードを引き継ぐ
   loadFolderScreen(folderId);
   showScreen('screen-folder');
 }
@@ -2795,12 +2793,12 @@ function loadFolderScreen(folderId){
   document.getElementById('folder-screen-title').textContent=folder.name||'フォルダ';
   const folderIsLocked=folder.locked;
   document.getElementById('btn-folder-edit').style.display=isAdmin&&!folderIsLocked?'flex':'none';
-  document.getElementById('folder-add-bar').style.display=isAdmin&&folderMode==='edit'&&!folderIsLocked?'flex':'none';
+  document.getElementById('folder-add-bar').style.display=isAdmin&&currentMode==='edit'&&!folderIsLocked?'flex':'none';
   // モードトグル表示
   const modeToggle=document.getElementById('folder-mode-toggle');
   if(modeToggle)modeToggle.style.display=isAdmin?'flex':'none';
-  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',folderMode==='view');
-  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',folderMode==='edit');
+  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',currentMode==='view');
+  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',currentMode==='edit');
   const lockBtn=document.getElementById('btn-folder-lock');
   if(lockBtn){
     lockBtn.style.display=isAdmin?'flex':'none';
@@ -2850,7 +2848,7 @@ function renderFolderMemoCard(m,i,total){
   }
 
   const folderLocked=_cache.folders?.[currentFolderId]?.locked;
-  const isEditMode=folderMode==='edit'&&isAdmin;
+  const isEditMode=currentMode==='edit'&&isAdmin;
   const upDisabled=i===0||m.locked||folderLocked;
   const downDisabled=i===total-1||m.locked||folderLocked;
   const editActions=isEditMode?`
