@@ -2996,35 +2996,23 @@ const LOCAL_CACHE_KEY = 'chara_memo_local_cache_v1';
 
 function saveLocalCache(){
   try {
+    // coverImageとfieldValues除外の軽量キャッシュ
+    const memosLite = {};
+    for(const [id, m] of Object.entries(_cache.memos||{})){
+      const {fieldValues, coverImage, ...meta} = m;
+      memosLite[id] = meta;
+    }
     const data = JSON.stringify({
       savedAt: Date.now(),
       groups: _cache.groups,
       formats: _cache.formats,
       folders: _cache.folders,
-      memos: _cache.memos
+      memos: memosLite
     });
     localStorage.setItem(LOCAL_CACHE_KEY, data);
     showToast('💾 キャッシュを保存しました');
   } catch(e) {
-    // 容量超過の場合は画像なしで保存
-    try {
-      const memosLite = {};
-      for(const [id, m] of Object.entries(_cache.memos||{})){
-        memosLite[id] = {...m, fieldValues: undefined}; // coverImageは保持
-      }
-      const data = JSON.stringify({
-        savedAt: Date.now(),
-        groups: _cache.groups,
-        formats: _cache.formats,
-        folders: _cache.folders,
-        memos: memosLite,
-        noImages: true
-      });
-      localStorage.setItem(LOCAL_CACHE_KEY, data);
-      showToast('💾 キャッシュ保存（画像除く）');
-    } catch(e2) {
-      showToast('容量不足でキャッシュできません');
-    }
+    showToast('キャッシュ保存に失敗しました');
   }
 }
 
@@ -3118,8 +3106,10 @@ async function fbGet(store, key) {
   if(!_cacheLoaded) await loadAllCache();
   const cached = _cache[store]?.[key];
   // メモの場合、fieldValuesがないキャッシュ（軽量版）なら再取得
-  if(cached !== undefined && !(store==='memos' && !cached.fieldValues)){
-    return cached;
+  if(cached !== undefined){
+    if(store !== 'memos') return cached;
+    if(cached.fieldValues !== undefined) return cached; // 完全キャッシュあり
+    // fieldValuesなし → Firebaseから再取得
   }
   // Firebaseから直接取得
   const db = window._firebaseDB;
@@ -3231,8 +3221,14 @@ async function init(){
         applyRoleUI();
         showScreen('screen-groups');
         await loadGroups();
-        // バックグラウンドでFirebaseと同期（キャッシュは手動保存のみ）
-        loadAllCache().then(()=>loadGroups());
+        // バックグラウンドでFirebaseと同期（完了後にリストも更新）
+        loadAllCache().then(async ()=>{
+          await loadGroups();
+          // メモ一覧画面なら再描画してアイコンを表示
+          if(document.getElementById('screen-memos')?.classList.contains('active')){
+            await loadMemos();
+          }
+        });
       } else {
         // キャッシュなし → Firebaseから全て読む
         await loadAllCache();
