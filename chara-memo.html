@@ -1099,11 +1099,8 @@ function renderMemoListFlat(memos){
 function setMode(mode){
   if(mode==='edit'&&!isAdmin){showToast('編集権限がありません');return;}
   currentMode=mode;
+  folderMode=mode; // フォルダモードも同期
   updateModeUI();
-  // フォルダモードトグルも更新
-  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',mode==='view');
-  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',mode==='edit');
-  // メモ一覧画面にいる場合のみ再描画
   if(document.getElementById('screen-memos')?.classList.contains('active'))renderMemoList(allMemos);
 }
 function updateModeUI(){
@@ -1231,7 +1228,7 @@ async function openMemo(memoId){
     if(document.getElementById(s)?.classList.contains('active')){
       memoReturnScreen=s;
       // フォルダ画面から開く場合はfolderModeを使う
-      // currentModeはすでに同期済み
+      if(s==='screen-folder') currentMode=folderMode;
       break;
     }
   }
@@ -2676,17 +2673,33 @@ let editingFolderId = null;
 
 function setFolderMode(mode){
   if(mode==='edit'&&!isAdmin){showToast('編集権限がありません');return;}
-  currentMode=mode;
-  // メモ一覧のトグルも更新
-  document.getElementById('mode-btn-view')?.classList.toggle('active',mode==='view');
-  document.getElementById('mode-btn-edit')?.classList.toggle('active',mode==='edit');
-  document.getElementById('memo-add-bar').style.display=mode==='edit'&&isAdmin?'flex':'none';
-  // フォルダのトグルを更新
-  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',mode==='view');
-  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',mode==='edit');
+  folderMode=mode;
+  // フォルダのトグルだけ更新（currentModeは触らない）
+  const vBtn=document.getElementById('folder-mode-btn-view');
+  const eBtn=document.getElementById('folder-mode-btn-edit');
+  if(vBtn){vBtn.classList.toggle('active',mode==='view');}
+  if(eBtn){eBtn.classList.toggle('active',mode==='edit');}
   const folderLocked=_cache.folders?.[currentFolderId]?.locked;
-  document.getElementById('folder-add-bar').style.display=isAdmin&&mode==='edit'&&!folderLocked?'flex':'none';
-  loadFolderScreen(currentFolderId);
+  const addBar=document.getElementById('folder-add-bar');
+  if(addBar)addBar.style.display=isAdmin&&mode==='edit'&&!folderLocked?'flex':'none';
+  // メモリストだけ再描画（ヘッダーは触らない）
+  const memos=getMemosByFolder(currentFolderId);
+  const el=document.getElementById('folder-memo-list');
+  if(!el)return;
+  const folder=_cache.folders?.[currentFolderId];
+  let html='';
+  if(folder?.autoTags?.length){
+    html+=`<div style="padding:10px 16px;display:flex;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--border)">
+      <span style="font-size:11px;color:var(--text-2);margin-right:4px;align-self:center">共通タグ</span>
+      ${folder.autoTags.map(t=>`<span style="padding:2px 8px;background:var(--accent-glow);color:var(--accent);border:1px solid rgba(124,106,245,0.3);border-radius:20px;font-size:11px">${esc(t)}</span>`).join('')}
+    </div>`;
+  }
+  if(!memos.length){
+    html+=`<div class="empty"><div class="empty-icon">📄</div><div class="empty-text">メモがありません</div></div>`;
+  }else{
+    html+=memos.map((m,i)=>renderFolderMemoCard(m,i,memos.length)).join('');
+  }
+  el.innerHTML=html;
 }
 
 function getFoldersByGroup(groupId){
@@ -2793,6 +2806,7 @@ function deleteFolderConfirm(){
 // フォルダ詳細画面
 async function openFolder(folderId){
   currentFolderId=folderId;
+  folderMode=currentMode; // メモ一覧のモードを引き継ぐ
   loadFolderScreen(folderId);
   showScreen('screen-folder');
 }
@@ -2803,12 +2817,12 @@ function loadFolderScreen(folderId){
   document.getElementById('folder-screen-title').textContent=folder.name||'フォルダ';
   const folderIsLocked=folder.locked;
   document.getElementById('btn-folder-edit').style.display=isAdmin&&!folderIsLocked?'flex':'none';
-  document.getElementById('folder-add-bar').style.display=isAdmin&&currentMode==='edit'&&!folderIsLocked?'flex':'none';
+  document.getElementById('folder-add-bar').style.display=isAdmin&&folderMode==='edit'&&!folderIsLocked?'flex':'none';
   // モードトグル表示
   const modeToggle=document.getElementById('folder-mode-toggle');
   if(modeToggle)modeToggle.style.display=isAdmin?'flex':'none';
-  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',currentMode==='view');
-  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',currentMode==='edit');
+  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',folderMode==='view');
+  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',folderMode==='edit');
   const lockBtn=document.getElementById('btn-folder-lock');
   if(lockBtn){
     lockBtn.style.display=isAdmin?'flex':'none';
@@ -2858,7 +2872,7 @@ function renderFolderMemoCard(m,i,total){
   }
 
   const folderLocked=_cache.folders?.[currentFolderId]?.locked;
-  const isEditMode=currentMode==='edit'&&isAdmin;
+  const isEditMode=folderMode==='edit'&&isAdmin;
   const upDisabled=i===0||m.locked||folderLocked;
   const downDisabled=i===total-1||m.locked||folderLocked;
   const editActions=isEditMode?`
