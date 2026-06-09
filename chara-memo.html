@@ -704,23 +704,6 @@ body.viewer-mode .image-thumb {
 <input type="file" id="cover-file-input" accept="image/*" style="display:none" onchange="handleCoverFile(event)">
 
 <script>
-// ===== DB =====
-const DB_NAME='CharaMemoDB2';
-let db;
-function openDB(){
-  return Promise.resolve(); // Firebase使用のためIndexedDB不要
-  return new Promise((res,rej)=>{
-    const req=indexedDB.open(DB_NAME,1);
-    req.onupgradeneeded=e=>{
-      const d=e.target.result;
-      ['groups','formats','memos'].forEach(s=>{if(!d.objectStoreNames.contains(s))d.createObjectStore(s,{keyPath:'id'});});
-    };
-    req.onsuccess=e=>{db=e.target.result;res(db);};
-    req.onerror=()=>rej(req.error);
-  });
-}
-const txs=(s,m='readonly')=>db.transaction(s,m).objectStore(s);
-
 // ===== STATE =====
 let currentGroupId=null,currentMemoId=null,currentMode='view';
 let memoReturnScreen='screen-memos'; // メモから戻る先の画面
@@ -3045,21 +3028,17 @@ let fbListeners = [];
 // Firebase DB操作（キャッシュ付き）
 async function loadAllCache() {
   const db = window._firebaseDB;
-  // フェーズ1: 軽いデータを先に読んでUIを表示
-  const [gs, fs, fds] = await Promise.all([
+  const [gs, fs, ms, fds] = await Promise.all([
     window._fbGet(window._fbRef(db, 'groups')),
     window._fbGet(window._fbRef(db, 'formats')),
+    window._fbGet(window._fbRef(db, 'memos')),
     window._fbGet(window._fbRef(db, 'folders'))
   ]);
   _cache.groups = gs.exists() ? gs.val() : {};
   _cache.formats = fs.exists() ? fs.val() : {};
+  _cache.memos = ms.exists() ? ms.val() : {};
   _cache.folders = fds.exists() ? fds.val() : {};
-  _cache.memos = {};
   _cacheLoaded = true;
-  // フェーズ2: メモ（画像含む）はバックグラウンドで読む
-  window._fbGet(window._fbRef(db, 'memos')).then(ms => {
-    _cache.memos = ms.exists() ? ms.val() : {};
-  }).catch(()=>{});
 }
 async function fbGetAll(store) {
   if(!_cacheLoaded) await loadAllCache();
@@ -3142,12 +3121,10 @@ function doLogout() {
 
 // ===== INIT =====
 async function init(){
-  // Firebase準備完了を待つ
   window._fbOnAuthStateChanged(window._firebaseAuth, async (user) => {
-    document.getElementById('loading').style.display='none';
     if (user) {
       currentUser = user;
-      // FirebaseからadminUIDを取得して判定
+      // adminUID取得
       try {
         const snap = await window._fbGet(window._fbRef(window._firebaseDB, 'config/adminUID'));
         const adminUID = snap.exists() ? snap.val() : null;
@@ -3157,16 +3134,19 @@ async function init(){
         isAdmin = false;
         showToast('admin取得エラー: '+e.message);
       }
+      // 全データ読み込み完了まで読み込み中を表示
+      await loadAllCache();
+      // 読み込み完了後にUI表示
+      document.getElementById('loading').style.display='none';
       document.getElementById('login-screen').style.display='none';
       document.getElementById('app').style.display='flex';
       applyRoleUI();
-      // 全データを一括読み込み
-      await loadAllCache();
       showScreen('screen-groups');
       await loadGroups();
     } else {
       currentUser = null;
       isAdmin = false;
+      document.getElementById('loading').style.display='none';
       document.getElementById('app').style.display='none';
       document.getElementById('login-screen').style.display='flex';
       document.getElementById('login-screen').style.flexDirection='column';
