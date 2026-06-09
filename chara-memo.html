@@ -711,6 +711,7 @@ body.viewer-mode .image-thumb {
 // ===== STATE =====
 let currentGroupId=null,currentMemoId=null,currentMode='view';
 let memoReturnScreen='screen-memos'; // メモから戻る先の画面
+let _syncPromise=null; // バックグラウンド同期のPromise
 // メモリキャッシュ（Firebaseの代わりにメモリから読む）
 let _cache = {groups:{}, formats:{}, memos:{}, folders:{}};
 let _cacheLoaded = false;
@@ -1222,20 +1223,26 @@ async function openMemo(memoId){
   updateAutosave('読み込み中...');
   try{
     const prevMemoId=currentMemoId;
-    currentMemo=await fbGet('memos',memoId);
-    if(!currentMemo){showToast('メモが見つかりません');return;}
-    currentFormat=await fbGet('formats',currentMemo.formatId);
+
+    // キャッシュから直接取得（awaitなし）→即座に開く
+    currentMemo = _cache.memos?.[memoId];
+    currentFormat = currentMemo?.formatId ? _cache.formats?.[currentMemo.formatId] : null;
+
+    // キャッシュにない場合のみFirebaseから取得
+    if(!currentMemo || !currentFormat){
+      currentMemo = currentMemo || await fbGet('memos', memoId);
+      if(!currentMemo){showToast('メモが見つかりません');return;}
+      currentFormat = currentFormat || await fbGet('formats', currentMemo.formatId);
+    }
+
     if(!currentMemo.linkedMemos)currentMemo.linkedMemos=[];
     if(!currentMemo.history)currentMemo.history=[];
     if(!currentMemo.coverImage)currentMemo.coverImage=null;
-    // メモを開くたびに常にリセット
     Object.keys(memoCollapseState).forEach(k=>delete memoCollapseState[k]);
     undoStack=[];redoStack=[];
     copiedUneditedKeys=new Set(currentMemo.copiedUneditedKeys||[]);
     currentMemoId=memoId;
-    // ロック中は強制的に閲覧モード
     if(currentMemo.locked && currentMode==='edit'){
-      // 閲覧モードで開くが一覧に戻ったときはeditモードを維持
       const savedMode=currentMode;
       currentMode='view';
       renderMemoDetail();
@@ -1245,6 +1252,19 @@ async function openMemo(memoId){
     }
     showScreen('screen-memo-detail');
     snapshotFields();
+    updateAutosave('保存済み');
+    // fieldValuesがなければバックグラウンドで取得して再描画
+    if(!currentMemo.fieldValues){
+      fbGet('memos', memoId).then(full=>{
+        if(full?.fieldValues && currentMemoId===memoId){
+          currentMemo=full;
+          _cache.memos[memoId]=full;
+          renderMemoDetail();
+          updateUndoRedoUI();
+          updateAutosave('保存済み');
+        }
+      });
+    }
   }catch(e){
     showToast('メモを開けませんでした: '+e.message);
   }
@@ -3232,15 +3252,17 @@ async function init(){
         showScreen('screen-groups');
         await loadGroups();
         // バックグラウンドでFirebaseと同期（完了後にリストも更新）
-        loadAllCache().then(async ()=>{
+        _syncPromise = loadAllCache().then(async ()=>{
           await loadGroups();
-          await loadMemos(); // 常に再描画してアイコンを表示
+          await loadMemos();
           if(currentFolderId && document.getElementById('screen-folder')?.classList.contains('active')){
             loadFolderScreen(currentFolderId);
           }
+          _syncPromise = null;
         });
       } else {
-        // キャッシュなし → Firebaseから全て読む
+        // キャッシュなし → Firebaseから全て読む（同期済み）
+        _syncPromise = null;
         await loadAllCache();
         document.getElementById('loading').style.display='none';
         document.getElementById('login-screen').style.display='none';
