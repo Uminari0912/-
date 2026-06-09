@@ -3045,17 +3045,21 @@ let fbListeners = [];
 // Firebase DB操作（キャッシュ付き）
 async function loadAllCache() {
   const db = window._firebaseDB;
-  const [gs, fs, ms, fds] = await Promise.all([
+  // フェーズ1: 軽いデータを先に読んでUIを表示
+  const [gs, fs, fds] = await Promise.all([
     window._fbGet(window._fbRef(db, 'groups')),
     window._fbGet(window._fbRef(db, 'formats')),
-    window._fbGet(window._fbRef(db, 'memos')),
     window._fbGet(window._fbRef(db, 'folders'))
   ]);
   _cache.groups = gs.exists() ? gs.val() : {};
   _cache.formats = fs.exists() ? fs.val() : {};
-  _cache.memos = ms.exists() ? ms.val() : {};
   _cache.folders = fds.exists() ? fds.val() : {};
+  _cache.memos = {};
   _cacheLoaded = true;
+  // フェーズ2: メモ（画像含む）はバックグラウンドで読む
+  window._fbGet(window._fbRef(db, 'memos')).then(ms => {
+    _cache.memos = ms.exists() ? ms.val() : {};
+  }).catch(()=>{});
 }
 async function fbGetAll(store) {
   if(!_cacheLoaded) await loadAllCache();
@@ -3063,7 +3067,16 @@ async function fbGetAll(store) {
 }
 async function fbGet(store, key) {
   if(!_cacheLoaded) await loadAllCache();
-  return _cache[store]?.[key];
+  if(_cache[store]?.[key] !== undefined) return _cache[store][key];
+  // キャッシュにない場合（メモがまだ読み込まれていない）はFirebaseから直接取得
+  const db = window._firebaseDB;
+  const snap = await window._fbGet(window._fbRef(db, `${store}/${key}`));
+  const val = snap.exists() ? snap.val() : undefined;
+  if(val !== undefined){
+    if(!_cache[store]) _cache[store] = {};
+    _cache[store][key] = val;
+  }
+  return val;
 }
 async function fbPut(store, val) {
   // キャッシュ更新
@@ -3148,7 +3161,6 @@ async function init(){
       document.getElementById('app').style.display='flex';
       applyRoleUI();
       // 全データを一括読み込み
-      showToast('データを読み込み中...');
       await loadAllCache();
       showScreen('screen-groups');
       await loadGroups();
