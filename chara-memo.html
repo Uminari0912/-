@@ -2894,17 +2894,6 @@ async function moveFolderMemo(memoId, dir){
 }
 
 
-// ===== フォルダ専用モード =====
-
-function setFolderMode(mode){
-  if(mode==='edit'&&!isAdmin)return;
-  folderMode=mode;
-  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',mode==='view');
-  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',mode==='edit');
-  document.getElementById('folder-add-bar').style.display=isAdmin&&mode==='edit'?'flex':'none';
-  loadFolderScreen(currentFolderId);
-}
-
 // ===== フォルダロック（フォルダ設定のロック）=====
 async function toggleFolderLock(){
   const folder=_cache.folders?.[currentFolderId];
