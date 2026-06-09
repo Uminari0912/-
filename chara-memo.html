@@ -317,6 +317,7 @@ body.viewer-mode .image-thumb {
     <span class="header-logo">✦ MEMO</span>
     <span class="header-title">グループ一覧</span>
     <span id="role-badge" style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--accent-glow);color:var(--accent);border:1px solid rgba(124,106,245,0.3);flex-shrink:0"></span>
+    <button class="btn-icon" id="btn-cache" onclick="saveLocalCache()" title="キャッシュ保存" style="font-size:14px">💾</button>
     <button class="btn-icon" id="btn-backup" onclick="openBackupModal()">⬡</button>
     <button class="btn-icon" id="btn-formats" onclick="showScreen('screen-formats')">⊞</button>
     <button class="btn-icon" onclick="doLogout()" title="ログアウト" style="font-size:14px">⏻</button>
@@ -2988,6 +2989,74 @@ async function deleteMemoInFolder(memoId){
 function openNewMemoModalInFolder(){
   openNewMemoModal(currentFolderId);
 }
+
+// ===== LOCAL CACHE =====
+const LOCAL_CACHE_KEY = 'chara_memo_local_cache_v1';
+
+function saveLocalCache(){
+  try {
+    const data = JSON.stringify({
+      savedAt: Date.now(),
+      groups: _cache.groups,
+      formats: _cache.formats,
+      folders: _cache.folders,
+      memos: _cache.memos
+    });
+    localStorage.setItem(LOCAL_CACHE_KEY, data);
+    showToast('💾 キャッシュを保存しました');
+  } catch(e) {
+    // 容量超過の場合は画像なしで保存
+    try {
+      const memosLite = {};
+      for(const [id, m] of Object.entries(_cache.memos||{})){
+        memosLite[id] = {...m, fieldValues: undefined, coverImage: undefined};
+      }
+      const data = JSON.stringify({
+        savedAt: Date.now(),
+        groups: _cache.groups,
+        formats: _cache.formats,
+        folders: _cache.folders,
+        memos: memosLite,
+        noImages: true
+      });
+      localStorage.setItem(LOCAL_CACHE_KEY, data);
+      showToast('💾 キャッシュ保存（画像除く）');
+    } catch(e2) {
+      showToast('容量不足でキャッシュできません');
+    }
+  }
+}
+
+function loadLocalCache(){
+  try {
+    const raw = localStorage.getItem(LOCAL_CACHE_KEY);
+    if(!raw) return false;
+    const data = JSON.parse(raw);
+    if(!data.savedAt) return false;
+    _cache.groups = data.groups || {};
+    _cache.formats = data.formats || {};
+    _cache.folders = data.folders || {};
+    _cache.memos = data.memos || {};
+    _cacheLoaded = true;
+    return data;
+  } catch(e) {
+    return false;
+  }
+}
+
+function clearLocalCache(){
+  localStorage.removeItem(LOCAL_CACHE_KEY);
+}
+
+async function forceReloadFromFirebase(){
+  showToast('🔄 最新データを取得中...');
+  _cacheLoaded = false;
+  await loadAllCache();
+  saveLocalCache();
+  await loadGroups();
+  showToast('✅ 更新完了');
+}
+
 // ===== BACKUP =====
 function openBackupModal(){openModal('modal-backup');}
 async function exportData(){
@@ -3134,15 +3203,41 @@ async function init(){
         isAdmin = false;
         showToast('admin取得エラー: '+e.message);
       }
-      // 全データ読み込み完了まで読み込み中を表示
-      await loadAllCache();
-      // 読み込み完了後にUI表示
-      document.getElementById('loading').style.display='none';
-      document.getElementById('login-screen').style.display='none';
-      document.getElementById('app').style.display='flex';
-      applyRoleUI();
-      showScreen('screen-groups');
-      await loadGroups();
+
+      // 1週間アクセスなしチェック
+      const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+      const lastAccess = parseInt(localStorage.getItem('chara_last_access') || '0');
+      if(lastAccess && Date.now() - lastAccess > WEEK_MS){
+        // 1週間以上アクセスなし → ログアウト＆キャッシュ削除
+        clearLocalCache();
+        localStorage.removeItem('chara_last_access');
+        await window._fbSignOut(window._firebaseAuth);
+        return;
+      }
+      // アクセス時刻を更新
+      localStorage.setItem('chara_last_access', Date.now().toString());
+
+      // ローカルキャッシュがあれば即座に表示
+      const cached = loadLocalCache();
+      if(cached){
+        document.getElementById('loading').style.display='none';
+        document.getElementById('login-screen').style.display='none';
+        document.getElementById('app').style.display='flex';
+        applyRoleUI();
+        showScreen('screen-groups');
+        await loadGroups();
+        // バックグラウンドでFirebaseと同期（キャッシュは手動保存のみ）
+        loadAllCache().then(()=>loadGroups());
+      } else {
+        // キャッシュなし → Firebaseから全て読む
+        await loadAllCache();
+        document.getElementById('loading').style.display='none';
+        document.getElementById('login-screen').style.display='none';
+        document.getElementById('app').style.display='flex';
+        applyRoleUI();
+        showScreen('screen-groups');
+        await loadGroups();
+      }
     } else {
       currentUser = null;
       isAdmin = false;
