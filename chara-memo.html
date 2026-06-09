@@ -1752,14 +1752,27 @@ async function copyToMemo(targetId){
 }
 function openLinkSelectModal(){
   const links=currentMemo.linkedMemos||[];
-  const candidates=allMemos.filter(m=>m.id!==currentMemo.id&&!links.includes(m.id));
+  // フォルダ内含む全メモから「キャラクター」タグ付きのもの
+  const allGroupMemos=Object.values(_cache.memos||{}).filter(m=>m.groupId===currentGroupId);
+  const candidates=allGroupMemos.filter(m=>{
+    if(m.id===currentMemo.id)return false;
+    if(links.includes(m.id))return false;
+    const effectiveTags=getEffectiveTags(m);
+    return effectiveTags.includes('キャラクター');
+  });
   const el=document.getElementById('link-select-list');
-  if(!candidates.length){el.innerHTML=`<p style="color:var(--text-2);font-size:13px;padding:12px 0">追加できるメモがありません</p>`;openModal('modal-link-select');return;}
-  el.innerHTML=candidates.map(m=>`
-    <div class="card" onclick="addMemoLink('${m.id}')">
-      <div class="card-title">${esc(m.title||'（名称未設定）')}</div>
-      <div class="card-sub">${esc(m.id)}</div>
-    </div>`).join('');
+  if(!candidates.length){el.innerHTML=`<p style="color:var(--text-2);font-size:13px;padding:12px 0">「キャラクター」タグのついたメモがありません</p>`;openModal('modal-link-select');return;}
+  el.innerHTML=candidates.map(m=>{
+    const coverImg=m.coverImage?`<img src="${m.coverImage}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0">`:
+      `<div style="width:36px;height:36px;border-radius:6px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">👤</div>`;
+    return`<div class="card" onclick="addMemoLink('${m.id}')" style="display:flex;align-items:center;gap:10px">
+      ${coverImg}
+      <div>
+        <div class="card-title">${esc(m.title||'（名称未設定）')}</div>
+        <div class="card-sub">${esc(m.id)}</div>
+      </div>
+    </div>`;
+  }).join('');
   openModal('modal-link-select');
 }
 function addMemoLink(targetId){
