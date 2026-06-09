@@ -87,6 +87,8 @@ html,body{height:100%;width:100%;background:var(--bg-0);color:var(--text-0);font
 .memo-card:active{border-color:var(--accent);}
 .memo-card-cover{width:72px;height:72px;flex-shrink:0;background:var(--bg-3);display:flex;align-items:center;justify-content:center;overflow:hidden;margin:10px 0 10px 10px;border-radius:10px;}
 .memo-card-cover img{width:100%;height:100%;object-fit:cover;border-radius:10px;}
+.memo-card-cover-loading{background:var(--bg-2);}
+.cover-spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
 .memo-card-cover-placeholder{font-size:22px;color:var(--text-2);}
 .memo-card-body{flex:1;padding:12px 14px;min-width:0;}
 .memo-card-actions{display:flex;flex-direction:column;justify-content:center;gap:4px;padding:8px 10px 8px 0;flex-shrink:0;}
@@ -1002,7 +1004,7 @@ function renderMemoList(memos){
     const more=(m.tags||[]).length>5?`<span class="tag-chip">+${m.tags.length-5}</span>`:'';
     const coverHtml=m.coverImage
       ?`<div class="memo-card-cover"><img src="${m.coverImage}" alt=""></div>`
-      :`<div class="memo-card-cover"><span class="memo-card-cover-placeholder">👤</span></div>`;
+      :`<div class="memo-card-cover memo-card-cover-loading"><div class="cover-spinner"></div></div>`;
     const editActions=currentMode==='edit'?`
       <div class="memo-card-actions">
         <button class="btn-icon" style="width:28px;height:28px;font-size:12px${i===0||m.locked?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveMemo(${i},-1)" title="上へ">↑</button>
@@ -1068,7 +1070,7 @@ function renderMemoListFlat(memos){
     const more=effectiveTags.length>5?`<span class="tag-chip">+${effectiveTags.length-5}</span>`:'';
     const coverHtml=m.coverImage
       ?`<div class="memo-card-cover"><img src="${m.coverImage}" alt=""></div>`
-      :`<div class="memo-card-cover"><span class="memo-card-cover-placeholder">👤</span></div>`;
+      :`<div class="memo-card-cover memo-card-cover-loading"><div class="cover-spinner"></div></div>`;
     const folderName=m.folderId&&_cache.folders?.[m.folderId]?`<span style="font-size:10px;color:var(--text-2)">📁 ${esc(_cache.folders[m.folderId].name)}</span>`:'';
     return `<div class="memo-card" onclick="openMemo('${m.id}')">
       ${coverHtml}
@@ -2855,7 +2857,7 @@ function renderFolderMemoCard(m,i,total){
   const more=effectiveTags.length>5?`<span class="tag-chip">+${effectiveTags.length-5}</span>`:'';
   const coverHtml=m.coverImage
     ?`<div class="memo-card-cover"><img src="${m.coverImage}" alt=""></div>`
-    :`<div class="memo-card-cover"><span class="memo-card-cover-placeholder">👤</span></div>`;
+    :`<div class="memo-card-cover memo-card-cover-loading"><div class="cover-spinner"></div></div>`;
 
   let emptyBadgeHtml='';
   if(currentMode==='edit'&&fmt){
@@ -2995,24 +2997,31 @@ function openNewMemoModalInFolder(){
 const LOCAL_CACHE_KEY = 'chara_memo_local_cache_v1';
 
 function saveLocalCache(){
-  try {
-    // coverImageとfieldValues除外の軽量キャッシュ
+  // まずcoverImage付きで試みる
+  const buildCache = (withCover) => {
     const memosLite = {};
     for(const [id, m] of Object.entries(_cache.memos||{})){
       const {fieldValues, coverImage, ...meta} = m;
-      memosLite[id] = meta;
+      memosLite[id] = withCover ? {...meta, coverImage} : meta;
     }
-    const data = JSON.stringify({
+    return JSON.stringify({
       savedAt: Date.now(),
       groups: _cache.groups,
       formats: _cache.formats,
       folders: _cache.folders,
       memos: memosLite
     });
-    localStorage.setItem(LOCAL_CACHE_KEY, data);
+  };
+  try {
+    localStorage.setItem(LOCAL_CACHE_KEY, buildCache(true));
     showToast('💾 キャッシュを保存しました');
-  } catch(e) {
-    showToast('キャッシュ保存に失敗しました');
+  } catch(e1) {
+    try {
+      localStorage.setItem(LOCAL_CACHE_KEY, buildCache(false));
+      showToast('💾 キャッシュ保存（アイコン除く）');
+    } catch(e2) {
+      showToast('容量不足でキャッシュできません');
+    }
   }
 }
 
@@ -3224,9 +3233,9 @@ async function init(){
         // バックグラウンドでFirebaseと同期（完了後にリストも更新）
         loadAllCache().then(async ()=>{
           await loadGroups();
-          // メモ一覧画面なら再描画してアイコンを表示
-          if(document.getElementById('screen-memos')?.classList.contains('active')){
-            await loadMemos();
+          await loadMemos(); // 常に再描画してアイコンを表示
+          if(currentFolderId && document.getElementById('screen-folder')?.classList.contains('active')){
+            loadFolderScreen(currentFolderId);
           }
         });
       } else {
