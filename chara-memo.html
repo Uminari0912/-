@@ -424,7 +424,7 @@ body.viewer-mode .image-thumb {
     <div class="modal-handle"></div>
     <div class="modal-header"><span>メモを追加</span><button class="btn-icon" onclick="closeModal('modal-new-memo')">✕</button></div>
     <div class="modal-body">
-      <div class="field-group"><label class="field-label">キャラ名</label><input class="field-input" type="text" id="new-memo-title" placeholder="キャラクター名"></div>
+      <div class="field-group"><label class="field-label">メモ名</label><input class="field-input" type="text" id="new-memo-title" placeholder="メモ名を入力..."></div>
       <div class="field-group"><label class="field-label">メモID <span style="color:var(--text-2);font-size:12px;text-transform:none">（省略で自動生成）</span></label><input class="field-input" type="text" id="new-memo-id" placeholder="例：chara_001"></div>
       <div class="field-group"><label class="field-label">フォーマット</label><select class="field-select" id="new-memo-format"></select></div>
     </div>
@@ -1098,7 +1098,9 @@ function renderMemoListFlat(memos){
 }
 function setMode(mode){
   if(mode==='edit'&&!isAdmin){showToast('編集権限がありません');return;}
-  currentMode=mode;updateModeUI();renderMemoList(allMemos);
+  currentMode=mode;
+  folderMode=mode; // フォルダモードも同期
+  updateModeUI();renderMemoList(allMemos);
 }
 function updateModeUI(){
   document.getElementById('mode-btn-view').classList.toggle('active',currentMode==='view');
@@ -1290,7 +1292,7 @@ function renderMemoDetail(){
 
   // Title
   if(isEdit){
-    html+=`<input class="memo-title-input" type="text" id="memo-title-field" value="${esc(m.title||'')}" placeholder="キャラ名" oninput="onMemoChange()">`;
+    html+=`<input class="memo-title-input" type="text" id="memo-title-field" value="${esc(m.title||'')}" placeholder="メモ名" oninput="onMemoChange()">`;
   }else{
     html+=`<div class="memo-title-view">${esc(m.title||'（名称未設定）')}</div>`;
   }
@@ -2668,9 +2670,10 @@ let editingFolderId = null;
 function setFolderMode(mode){
   if(mode==='edit'&&!isAdmin){showToast('編集権限がありません');return;}
   folderMode=mode;
+  currentMode=mode; // グローバルモードも同期
   document.getElementById('folder-mode-btn-view')?.classList.toggle('active',mode==='view');
   document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',mode==='edit');
-  document.getElementById('folder-add-bar').style.display=isAdmin&&mode==='edit'?'flex':'none';
+  document.getElementById('folder-add-bar').style.display=isAdmin&&mode==='edit'&&!(_cache.folders?.[currentFolderId]?.locked)?'flex':'none';
   loadFolderScreen(currentFolderId);
 }
 
@@ -2778,7 +2781,7 @@ function deleteFolderConfirm(){
 // フォルダ詳細画面
 async function openFolder(folderId){
   currentFolderId=folderId;
-  folderMode='view';
+  folderMode=currentMode; // メモ一覧のモードを引き継ぐ
   loadFolderScreen(folderId);
   showScreen('screen-folder');
 }
