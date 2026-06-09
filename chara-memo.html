@@ -2675,7 +2675,17 @@ let pendingFolderTags = [];
 let editingFolderId = null;
 
 function setFolderMode(mode){
-  setMode(mode); // currentModeを更新して全UI同期
+  if(mode==='edit'&&!isAdmin){showToast('編集権限がありません');return;}
+  currentMode=mode;
+  // メモ一覧のトグルも更新
+  document.getElementById('mode-btn-view')?.classList.toggle('active',mode==='view');
+  document.getElementById('mode-btn-edit')?.classList.toggle('active',mode==='edit');
+  document.getElementById('memo-add-bar').style.display=mode==='edit'&&isAdmin?'flex':'none';
+  // フォルダのトグルを更新
+  document.getElementById('folder-mode-btn-view')?.classList.toggle('active',mode==='view');
+  document.getElementById('folder-mode-btn-edit')?.classList.toggle('active',mode==='edit');
+  const folderLocked=_cache.folders?.[currentFolderId]?.locked;
+  document.getElementById('folder-add-bar').style.display=isAdmin&&mode==='edit'&&!folderLocked?'flex':'none';
   loadFolderScreen(currentFolderId);
 }
 
