@@ -673,6 +673,25 @@ body.viewer-mode .image-thumb {
   </div>
 </div>
 
+<!-- MEMO ID MODAL -->
+<div class="modal-overlay" id="modal-memo-id">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span>メモIDを変更</span><button class="btn-icon" onclick="closeModal('modal-memo-id')">✕</button></div>
+    <div class="modal-body">
+      <div class="field-group">
+        <label class="field-label">新しいID</label>
+        <input class="field-input" type="text" id="new-memo-id-input" placeholder="例：chara_001">
+        <p style="font-size:11px;color:var(--text-2);margin-top:4px">半角英数字・アンダースコアのみ推奨</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-memo-id')">キャンセル</button>
+      <button class="btn btn-primary flex-1" onclick="changeMemoId()">変更</button>
+    </div>
+  </div>
+</div>
+
 <!-- COPY TO MODAL -->
 <div class="modal-overlay" id="modal-copy-to">
   <div class="modal">
@@ -1253,8 +1272,9 @@ async function openMemo(memoId){
     showScreen('screen-memo-detail');
     snapshotFields();
     updateAutosave('保存済み');
-    // fieldValuesがなければバックグラウンドで取得して再描画
-    if(!currentMemo.fieldValues){
+    // fieldValuesが未取得or空の場合はバックグラウンドで取得して再描画
+    const needsFetch = !currentMemo.fieldValues || Object.keys(currentMemo.fieldValues).length === 0;
+    if(needsFetch){
       fbGet('memos', memoId).then(full=>{
         if(full?.fieldValues && currentMemoId===memoId){
           currentMemo=full;
@@ -1311,7 +1331,7 @@ function renderMemoDetail(){
 
   // Badges
   html+=`<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-    <span class="badge badge-text">ID: ${esc(m.id)}</span>
+    <span class="badge badge-text" ${isEdit?'onclick="openMemoIdModal()" style="cursor:pointer" title="IDを変更"':''}>ID: ${esc(m.id)}</span>
     <span class="badge badge-section">${esc(fmt?fmt.name:'?')}</span>
     ${isEdit?`<span class="badge" style="background:var(--bg-4);color:var(--text-2);border:1px solid var(--border);cursor:pointer" onclick="openFormatChangeModal()">フォーマット変更</span>`:''}
   </div>`;
@@ -3018,12 +3038,21 @@ function openNewMemoModalInFolder(){
 const LOCAL_CACHE_KEY = 'chara_memo_local_cache_v1';
 
 function saveLocalCache(){
-  // まずcoverImage付きで試みる
   const buildCache = (withCover) => {
     const memosLite = {};
     for(const [id, m] of Object.entries(_cache.memos||{})){
-      const {fieldValues, coverImage, ...meta} = m;
-      memosLite[id] = withCover ? {...meta, coverImage} : meta;
+      const {coverImage, ...meta} = m;
+      // fieldValuesから画像（base64）だけ除いてキャッシュ
+      const filteredFV = {};
+      for(const [k, v] of Object.entries(m.fieldValues||{})){
+        if(typeof v==='string' && v.startsWith('data:')) continue; // 画像スキップ
+        if(Array.isArray(v)){
+          filteredFV[k]=v.filter(item=>!(typeof item==='string'&&item.startsWith('data:')));
+        } else {
+          filteredFV[k]=v;
+        }
+      }
+      memosLite[id] = {...meta, fieldValues: filteredFV, ...(withCover ? {coverImage} : {})};
     }
     return JSON.stringify({
       savedAt: Date.now(),
@@ -3074,6 +3103,44 @@ async function forceReloadFromFirebase(){
   saveLocalCache();
   await loadGroups();
   showToast('✅ 更新完了');
+}
+
+
+function openMemoIdModal(){
+  if(!currentMemo)return;
+  document.getElementById('new-memo-id-input').value=currentMemo.id;
+  openModal('modal-memo-id');
+  setTimeout(()=>{
+    const el=document.getElementById('new-memo-id-input');
+    el.focus();el.select();
+  },300);
+}
+
+async function changeMemoId(){
+  const newId=document.getElementById('new-memo-id-input').value.trim();
+  if(!newId){showToast('IDを入力してください');return;}
+  if(newId===currentMemo.id){closeModal('modal-memo-id');return;}
+  if(_cache.memos?.[newId]){showToast('そのIDは既に使われています');return;}
+  const oldId=currentMemo.id;
+  // 新IDでメモを保存
+  const updated={...currentMemo, id:newId, updatedAt:now()};
+  _cache.memos[newId]=updated;
+  await fbPut('memos',updated);
+  // 旧IDを削除
+  delete _cache.memos[oldId];
+  await fbDelete('memos',oldId);
+  // 他のメモのlinkedMemosの参照を更新
+  for(const m of Object.values(_cache.memos||{})){
+    if((m.linkedMemos||[]).includes(oldId)){
+      m.linkedMemos=m.linkedMemos.map(id=>id===oldId?newId:id);
+      await fbPut('memos',m);
+    }
+  }
+  currentMemo=updated;
+  currentMemoId=newId;
+  closeModal('modal-memo-id');
+  renderMemoDetail();
+  showToast('IDを変更しました');
 }
 
 // ===== BACKUP =====
@@ -3138,8 +3205,8 @@ async function fbGet(store, key) {
   // メモの場合、fieldValuesがないキャッシュ（軽量版）なら再取得
   if(cached !== undefined){
     if(store !== 'memos') return cached;
-    if(cached.fieldValues !== undefined) return cached; // 完全キャッシュあり
-    // fieldValuesなし → Firebaseから再取得
+    if(cached.fieldValues !== undefined) return cached; // fieldValuesあり→即返す
+    // fieldValuesなし→Firebaseから再取得
   }
   // Firebaseから直接取得
   const db = window._firebaseDB;
