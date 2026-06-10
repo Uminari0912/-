@@ -3140,6 +3140,9 @@ async function changeMemoId(){
   currentMemoId=newId;
   closeModal('modal-memo-id');
   renderMemoDetail();
+  // 一覧を更新（古いIDが残らないように）
+  await loadMemos();
+  if(currentFolderId) loadFolderScreen(currentFolderId);
   showToast('IDを変更しました');
 }
 
@@ -3320,6 +3323,7 @@ async function init(){
         await loadGroups();
         // バックグラウンドでFirebaseと同期（完了後にリストも更新）
         _syncPromise = loadAllCache().then(async ()=>{
+          saveLocalCache(); // 同期完了後にキャッシュ更新
           await loadGroups();
           await loadMemos();
           if(currentFolderId && document.getElementById('screen-folder')?.classList.contains('active')){
@@ -3328,9 +3332,10 @@ async function init(){
           _syncPromise = null;
         });
       } else {
-        // キャッシュなし → Firebaseから全て読む（同期済み）
+        // キャッシュなし → Firebaseから全て読む
         _syncPromise = null;
         await loadAllCache();
+        saveLocalCache(); // 初回ロード後に自動保存
         document.getElementById('loading').style.display='none';
         document.getElementById('login-screen').style.display='none';
         document.getElementById('app').style.display='flex';
