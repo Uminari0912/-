@@ -2230,8 +2230,20 @@ function onFieldTypeChange(){
 }
 function renderFieldOptions(opts){
   document.getElementById('field-options-list').innerHTML=opts.map((o,i)=>
-    `<div class="option-item"><input class="field-input" type="text" value="${esc(o)}" placeholder="選択肢"><button class="btn-icon" style="width:32px;height:32px;font-size:13px;color:var(--danger)" onclick="removeFieldOption(${i})">✕</button></div>`
+    `<div class="option-item" style="display:flex;align-items:center;gap:4px">
+      <input class="field-input" type="text" value="${esc(o)}" placeholder="選択肢" style="flex:1">
+      <button class="btn-icon" style="width:28px;height:28px;font-size:12px${i===0?';opacity:0.25;pointer-events:none':''}" onclick="moveFieldOption(${i},-1)">↑</button>
+      <button class="btn-icon" style="width:28px;height:28px;font-size:12px${i===opts.length-1?';opacity:0.25;pointer-events:none':''}" onclick="moveFieldOption(${i},1)">↓</button>
+      <button class="btn-icon" style="width:28px;height:28px;font-size:13px;color:var(--danger)" onclick="removeFieldOption(${i})">✕</button>
+    </div>`
   ).join('');
+}
+function moveFieldOption(i, dir){
+  const opts=getFieldOptions();
+  const ni=i+dir;
+  if(ni<0||ni>=opts.length)return;
+  [opts[i],opts[ni]]=[opts[ni],opts[i]];
+  renderFieldOptions(opts);
 }
 function getFieldOptions(){return Array.from(document.querySelectorAll('#field-options-list .option-item input')).map(i=>i.value.trim()).filter(Boolean);}
 function addFieldOption(){renderFieldOptions([...getFieldOptions(),'']);const inputs=document.querySelectorAll('#field-options-list .option-item input');if(inputs.length)inputs[inputs.length-1].focus();}
