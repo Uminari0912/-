@@ -731,6 +731,7 @@ body.viewer-mode .image-thumb {
 let currentGroupId=null,currentMemoId=null,currentMode='view';
 let memoReturnScreen='screen-memos'; // メモから戻る先の画面
 let _syncPromise=null; // バックグラウンド同期のPromise
+let _userEditedSinceOpen=false; // メモを開いてからユーザーが編集したか（競合防止用）
 // メモリキャッシュ（Firebaseの代わりにメモリから読む）
 let _cache = {groups:{}, formats:{}, memos:{}, folders:{}};
 let _cacheLoaded = false;
@@ -828,6 +829,7 @@ function undoMemo(){
   currentMemo.fieldValues=JSON.parse(JSON.stringify(state.fieldValues));
   currentMemo.title=state.title;
   currentMemo.updatedAt=now();
+  _userEditedSinceOpen=true;
   fbPut('memos',currentMemo);
   updateUndoRedoUI();
   renderMemoDetail();
@@ -843,6 +845,7 @@ function redoMemo(){
   currentMemo.fieldValues=JSON.parse(JSON.stringify(state.fieldValues));
   currentMemo.title=state.title;
   currentMemo.updatedAt=now();
+  _userEditedSinceOpen=true;
   fbPut('memos',currentMemo);
   updateUndoRedoUI();
   renderMemoDetail();
@@ -1274,9 +1277,13 @@ async function openMemo(memoId){
     updateAutosave('保存済み');
     // fieldValuesが未取得or空の場合はバックグラウンドで取得して再描画
     const needsFetch = !currentMemo.fieldValues || Object.keys(currentMemo.fieldValues).length === 0;
+    _userEditedSinceOpen = false;
     if(needsFetch){
+      const fetchMemoId = memoId;
       fbGet('memos', memoId).then(full=>{
-        if(full?.fieldValues && currentMemoId===memoId){
+        // ユーザーが既に編集を始めていたら、バックグラウンド取得結果での上書きは行わない
+        if(_userEditedSinceOpen || currentMemoId!==fetchMemoId) return;
+        if(full?.fieldValues){
           currentMemo=full;
           _cache.memos[memoId]=full;
           renderMemoDetail();
@@ -1479,6 +1486,7 @@ function snapshotFields(){
 }
 
 function onMemoChange(){
+  _userEditedSinceOpen=true; // 編集競合防止フラグ
   clearTimeout(autosaveTimer);
   updateAutosave('保存中...');
   autosaveTimer=setTimeout(saveMemoNow,500);
@@ -1557,6 +1565,7 @@ function removeListItem(key,idx){
 
 async function saveMemoNow(){
   if(!currentMemo)return;
+  _userEditedSinceOpen=true; // 保存が走る=編集確定、競合防止
   // キャッシュを即時更新
   _cache.memos[currentMemo.id]=JSON.parse(JSON.stringify(currentMemo));
   const titleEl=document.getElementById('memo-title-field');
@@ -1629,6 +1638,7 @@ async function handleCoverFile(e){
     }
   }
   currentMemo.coverImage=b64;
+  _userEditedSinceOpen=true; // 競合防止フラグ
   await saveMemoNow();renderMemoDetail();showToast('カバー画像を設定しました');
 }
 function removeCoverImage(){
@@ -1673,6 +1683,7 @@ async function handleImageFiles(e){
     }
   }
   currentMemo.fieldValues[key]=[...existing,...newImgs];
+  _userEditedSinceOpen=true; // 競合防止フラグ
   if(copiedUneditedKeys.has(key)){
     copiedUneditedKeys.delete(key);
     currentMemo.copiedUneditedKeys=(currentMemo.copiedUneditedKeys||[]).filter(k=>k!==key);
@@ -2636,6 +2647,7 @@ function applyTrimmer(){
   const result=out.toDataURL('image/png');
   if(currentMemo){
     currentMemo.coverImage=result;
+    _userEditedSinceOpen=true; // 競合防止フラグ
     fbPut('memos',currentMemo);
     renderMemoDetail();
   }
