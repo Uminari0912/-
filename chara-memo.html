@@ -539,6 +539,7 @@ body.viewer-mode .image-thumb {
     </div>
     <div class="modal-footer" style="flex-direction:column;gap:8px">
       <button class="btn btn-primary btn-full" id="out-copy-btn" onclick="copyOutput()">📋 全コピー</button>
+      <button class="btn btn-secondary btn-full" id="out-md-btn" onclick="downloadOutputMd()">📄 .mdファイルで保存</button>
       <button class="btn btn-secondary btn-full" id="out-generate-btn" onclick="generateCustomOutput()" style="display:none">この内容で出力</button>
     </div>
   </div>
@@ -786,6 +787,10 @@ let editingSectionIdx=null,editingFieldIdx=null;
 let autosaveTimer=null,importMode=null,pendingImageKey=null;
 let lightboxImages=[],lightboxIdx=0;
 let dragSrcIdx=null;
+// 予期しないエラーは無言で壊れず、トーストで内容を表示する（原因調査用）
+window.addEventListener('error',e=>{ try{showToast('⚠ エラー: '+String(e.message||'').slice(0,80));}catch(_){} });
+window.addEventListener('unhandledrejection',e=>{ try{showToast('⚠ エラー: '+String((e.reason&&e.reason.message)||e.reason||'').slice(0,80));}catch(_){} });
+
 // 時点（キャラ別タイムライン）: null=基本, それ以外=eventId
 let currentTimepoint=null;
 let outputTimepoint=null;
@@ -802,6 +807,15 @@ const formatCollapseState={};
 // ===== UTILS =====
 const uuid=()=>'id_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const now=()=>new Date().toISOString();
+// JSON.parse(JSON.stringify(...))の代わり。構造はコピーするが文字列（画像base64含む）は
+// 共有するので、画像入りメモでもメモリをほぼ消費しない（JSは文字列が不変なので安全）
+function cloneFV(v){
+  if(v===null||typeof v!=='object')return v;
+  if(Array.isArray(v))return v.map(cloneFV);
+  const o={};
+  for(const k in v)o[k]=cloneFV(v[k]);
+  return o;
+}
 const esc=s=>s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
 function showToast(msg){
@@ -834,7 +848,7 @@ function updateEmptyUI(key){
   const sec=currentFormat.sections.find(s=>s.sectionId===secId);
   if(!sec)return;
   const sid=`sec_${secId}`;
-  const mv=getMergedValues(currentMemo,currentTimepoint);
+  const mv=currentTimepoint?getMergedValues(currentMemo,currentTimepoint):(currentMemo.fieldValues||{});
   // フィールドヘッダー更新
   const fhdr=document.getElementById(`fhdr_${key}`);
   const field=sec.fields.find(f=>`${sec.sectionId}_${f.fieldId}`===key);
@@ -859,9 +873,9 @@ function updateEmptyUI(key){
 function pushUndoStack(){
   if(!currentMemo)return;
   undoStack.push({
-    fieldValues:JSON.parse(JSON.stringify(currentMemo.fieldValues||{})),
-    overrides:JSON.parse(JSON.stringify(currentMemo.overrides||{})),
-    timeline:JSON.parse(JSON.stringify(currentMemo.timeline||[])),
+    fieldValues:cloneFV(currentMemo.fieldValues||{}),
+    overrides:cloneFV(currentMemo.overrides||{}),
+    timeline:cloneFV(currentMemo.timeline||[]),
     title:currentMemo.title||''
   });
   if(undoStack.length>50)undoStack.shift();
@@ -871,15 +885,15 @@ function pushUndoStack(){
 function undoMemo(){
   if(!undoStack.length){showToast('これ以上戻れません');return;}
   redoStack.push({
-    fieldValues:JSON.parse(JSON.stringify(currentMemo.fieldValues||{})),
-    overrides:JSON.parse(JSON.stringify(currentMemo.overrides||{})),
-    timeline:JSON.parse(JSON.stringify(currentMemo.timeline||[])),
+    fieldValues:cloneFV(currentMemo.fieldValues||{}),
+    overrides:cloneFV(currentMemo.overrides||{}),
+    timeline:cloneFV(currentMemo.timeline||[]),
     title:currentMemo.title||''
   });
   const state=undoStack.pop();
-  currentMemo.fieldValues=JSON.parse(JSON.stringify(state.fieldValues));
-  currentMemo.overrides=JSON.parse(JSON.stringify(state.overrides||{}));
-  currentMemo.timeline=JSON.parse(JSON.stringify(state.timeline||[]));
+  currentMemo.fieldValues=cloneFV(state.fieldValues);
+  currentMemo.overrides=cloneFV(state.overrides||{});
+  currentMemo.timeline=cloneFV(state.timeline||[]);
   currentMemo.title=state.title;
   currentMemo.updatedAt=now();
   _userEditedSinceOpen=true;
@@ -891,15 +905,15 @@ function undoMemo(){
 function redoMemo(){
   if(!redoStack.length){showToast('これ以上やり直せません');return;}
   undoStack.push({
-    fieldValues:JSON.parse(JSON.stringify(currentMemo.fieldValues||{})),
-    overrides:JSON.parse(JSON.stringify(currentMemo.overrides||{})),
-    timeline:JSON.parse(JSON.stringify(currentMemo.timeline||[])),
+    fieldValues:cloneFV(currentMemo.fieldValues||{}),
+    overrides:cloneFV(currentMemo.overrides||{}),
+    timeline:cloneFV(currentMemo.timeline||[]),
     title:currentMemo.title||''
   });
   const state=redoStack.pop();
-  currentMemo.fieldValues=JSON.parse(JSON.stringify(state.fieldValues));
-  currentMemo.overrides=JSON.parse(JSON.stringify(state.overrides||{}));
-  currentMemo.timeline=JSON.parse(JSON.stringify(state.timeline||[]));
+  currentMemo.fieldValues=cloneFV(state.fieldValues);
+  currentMemo.overrides=cloneFV(state.overrides||{});
+  currentMemo.timeline=cloneFV(state.timeline||[]);
   currentMemo.title=state.title;
   currentMemo.updatedAt=now();
   _userEditedSinceOpen=true;
@@ -994,12 +1008,12 @@ function getTimeline(memo){
 }
 // 基本設定に、指定した出来事までの上書きを順番に累積適用した値を返す
 function getMergedValues(memo,eventId){
-  const base=JSON.parse(JSON.stringify(memo.fieldValues||{}));
+  const base=cloneFV(memo.fieldValues||{});
   if(!eventId)return base;
   const ov=memo.overrides||{};
   for(const ev of getTimeline(memo)){
     const o=ov[ev.id];
-    if(o)for(const k of Object.keys(o))base[k]=JSON.parse(JSON.stringify(o[k]));
+    if(o)for(const k of Object.keys(o))base[k]=cloneFV(o[k]);
     if(ev.id===eventId)break;
   }
   return base;
@@ -1547,9 +1561,9 @@ async function duplicateMemo(memoId){
     ...src,
     id:newId,
     title:(src.title||'')+'_コピー',
-    fieldValues:JSON.parse(JSON.stringify(src.fieldValues||{})),
-    overrides:JSON.parse(JSON.stringify(src.overrides||{})),
-    timeline:JSON.parse(JSON.stringify(src.timeline||[])),
+    fieldValues:cloneFV(src.fieldValues||{}),
+    overrides:cloneFV(src.overrides||{}),
+    timeline:cloneFV(src.timeline||[]),
     tags:[...(src.tags||[])],
     linkedMemos:[...(src.linkedMemos||[])],
     history:[],
@@ -1909,7 +1923,7 @@ function renderFieldBody(field,val,key,isEdit){
 let prevFieldSnapshot={};
 function snapshotFields(){
   if(!currentMemo)return;
-  prevFieldSnapshot=JSON.parse(JSON.stringify(currentMemo.fieldValues||{}));
+  prevFieldSnapshot=cloneFV(currentMemo.fieldValues||{});
 }
 
 function onMemoChange(){
@@ -1994,7 +2008,7 @@ async function saveMemoNow(){
   if(!currentMemo)return;
   _userEditedSinceOpen=true; // 保存が走る=編集確定、競合防止
   // キャッシュを即時更新
-  _cache.memos[currentMemo.id]=JSON.parse(JSON.stringify(currentMemo));
+  _cache.memos[currentMemo.id]=cloneFV(currentMemo);
   const titleEl=document.getElementById('memo-title-field');
   const oldTitle=currentMemo.title;
   if(titleEl)currentMemo.title=titleEl.value.trim()||'（名称未設定）';
@@ -2204,9 +2218,9 @@ async function copyToMemo(targetId){
     async()=>{
       const copied={
         ...target,
-        fieldValues:JSON.parse(JSON.stringify(currentMemo.fieldValues||{})),
-        overrides:JSON.parse(JSON.stringify(currentMemo.overrides||{})),
-        timeline:JSON.parse(JSON.stringify(currentMemo.timeline||[])),
+        fieldValues:cloneFV(currentMemo.fieldValues||{}),
+        overrides:cloneFV(currentMemo.overrides||{}),
+        timeline:cloneFV(currentMemo.timeline||[]),
         tags:[...(currentMemo.tags||[])],
         coverImage:currentMemo.coverImage||null,
         copiedUneditedKeys:Object.keys(currentMemo.fieldValues||{}),
@@ -2383,6 +2397,7 @@ function switchOutputTab(tab){
   const textArea=document.getElementById('out-text-area');
   const customArea=document.getElementById('out-custom-area');
   const copyBtn=document.getElementById('out-copy-btn');
+  const mdBtn=document.getElementById('out-md-btn');
   const genBtn=document.getElementById('out-generate-btn');
   const customTextEl=document.getElementById('output-text-custom');
 
@@ -2390,6 +2405,7 @@ function switchOutputTab(tab){
     textArea.style.display='block';
     customArea.style.display='none';
     copyBtn.style.display='flex';
+    if(mdBtn)mdBtn.style.display='flex';
     genBtn.style.display='none';
     // フォーマットタブ：出力セット選択UI表示
     if(tab==='format'){
@@ -2415,6 +2431,7 @@ function switchOutputTab(tab){
     textArea.style.display='none';
     customArea.style.display='block';
     copyBtn.style.display='none';
+    if(mdBtn)mdBtn.style.display='none';
     genBtn.style.display='flex';
     customTextEl.style.display='none';
     renderCustomSelector();
@@ -2587,6 +2604,7 @@ function toggleCustomField(key,secId){
   // 大項目チェック状態を更新
   updateSectionCheck(parseInt(secId));
   renderCustomSelector();
+  refreshCustomOutputIfShown();
 }
 
 function toggleCustomSection_check(secId){
@@ -2599,6 +2617,7 @@ function toggleCustomSection_check(secId){
     customChecked[`${sec.sectionId}_${f.fieldId}`]=!allChecked;
   }
   renderCustomSelector();
+  refreshCustomOutputIfShown();
 }
 
 function updateSectionCheck(secId){
@@ -2611,7 +2630,36 @@ function generateCustomOutput(){
   el.textContent=out||'（選択された項目がありません）';
   el.style.display='block';
   document.getElementById('out-copy-btn').style.display='flex';
+  const mdBtn=document.getElementById('out-md-btn');
+  if(mdBtn)mdBtn.style.display='flex';
   document.getElementById('out-generate-btn').style.display='none';
+}
+// 出力済みのカスタムテキストが表示中なら、チェック変更に合わせて即時更新
+function refreshCustomOutputIfShown(){
+  const el=document.getElementById('output-text-custom');
+  if(el&&el.style.display!=='none'){
+    el.textContent=buildCustomOutput()||'（選択された項目がありません）';
+  }
+}
+// 表示中の出力を .md ファイルとして保存
+function downloadOutputMd(){
+  const isCustom=currentOutputTab==='custom';
+  const el=isCustom?document.getElementById('output-text-custom'):document.getElementById('output-text');
+  let text=el?el.textContent:'';
+  if(isCustom&&(!el||el.style.display==='none'))text=buildCustomOutput();
+  if(!text||text==='（選択された項目がありません）'||text==='（出力対象の入力がありません）'){
+    showToast('出力する内容がありません');return;
+  }
+  const ev=outputTimepoint?(currentMemo.timeline||[]).find(e=>e.id===outputTimepoint):null;
+  const safe=n=>String(n||'').replace(/[\\\/:*?"<>|\n]/g,'_').trim().slice(0,40);
+  const fname=`${safe(currentMemo.title)||'キャラ設定'}${ev?'_'+safe(ev.name)+'後':''}.md`;
+  const blob=new Blob([text],{type:'text/markdown;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=fname;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  showToast(`📄 ${fname} を保存しました`);
 }
 
 async function copyOutput(){
