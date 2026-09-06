@@ -1096,6 +1096,11 @@ function deleteEvent(id){
 
 // ===== テキスト取り込み =====
 let importParsed=null;
+let importClearable=null; // テキストに無かった項目（空欄上書き候補）
+function emptyValOf(field){
+  if(field.type==='index'||field.type==='list')return [];
+  return '';
+}
 function openImportTextModal(){
   if(!isAdmin){showToast('編集権限がありません');return;}
   if(!currentMemo||!currentFormat)return;
@@ -1249,6 +1254,32 @@ function parseImportPreview(){
   if(unmatched.length){
     html+=`<div style="margin-top:12px;font-size:12px;color:var(--text-2);line-height:1.6">フォーマットに無いため無視した項目：${unmatched.map(u=>esc(u)).join('、')}</div>`;
   }
+  // テキストに無かった項目（画像以外・現在値あり）→ 空欄上書き候補
+  const foundKeys=new Set(results.map(r=>r.key));
+  importClearable=[];
+  for(const sec of [...currentFormat.sections].sort((a,b)=>a.order-b.order)){
+    for(const f of [...sec.fields].sort((a,b)=>a.order-b.order)){
+      if(f.type==='image')continue;
+      const key=`${sec.sectionId}_${f.fieldId}`;
+      if(foundKeys.has(key))continue;
+      if(isEmptyVal(f,mv[key],key))continue; // もともと空なら対象外
+      importClearable.push({key,field:f,secName:sec.name});
+    }
+  }
+  if(importClearable.length){
+    html+=`<div style="margin-top:14px;padding:10px 12px;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm)">
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+        <input type="checkbox" id="import-clear-missing" style="margin-top:2px;accent-color:var(--danger)" onchange="document.getElementById('import-clear-list').style.display=this.checked?'block':'none'">
+        <span style="font-size:13px;line-height:1.5">テキストに無かった項目を<span style="color:var(--danger)">空欄で上書き</span>する<br><span style="font-size:11px;color:var(--text-2)">貼り付けた内容と完全に同じ状態にしたいときに（${importClearable.length}項目が対象）</span></span>
+      </label>
+      <div id="import-clear-list" style="display:none;margin-top:8px;border-top:1px solid var(--border);padding-top:4px">
+        ${importClearable.map((r,i)=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;cursor:pointer">
+          <input type="checkbox" checked data-clr="${i}" style="margin-top:2px;accent-color:var(--danger)">
+          <span style="flex:1;min-width:0;font-size:12px;line-height:1.5">${esc(r.secName)} › ${esc(r.field.name)}<br><span style="color:var(--text-2);font-size:11px">現在: ${esc(String(displayVal(r.field,mv[r.key])||'').slice(0,40))}</span></span>
+        </label>`).join('')}
+      </div>
+    </div>`;
+  }
   document.getElementById('import-step2').innerHTML=html;
   showImportStep(2);
 }
@@ -1256,13 +1287,20 @@ function applyImport(){
   if(!importParsed||!currentMemo)return;
   const checks=document.querySelectorAll('#import-step2 input[data-imp]');
   const sel=[...checks].filter(c=>c.checked).map(c=>importParsed[+c.dataset.imp]).filter(Boolean);
-  if(!sel.length){showToast('取り込む項目を選択してください');return;}
+  // 空欄上書き対象
+  let clears=[];
+  if(document.getElementById('import-clear-missing')?.checked&&importClearable){
+    clears=[...document.querySelectorAll('#import-clear-list input[data-clr]')]
+      .filter(c=>c.checked).map(c=>importClearable[+c.dataset.clr]).filter(Boolean);
+  }
+  if(!sel.length&&!clears.length){showToast('取り込む項目を選択してください');return;}
   pushUndoStack();
   for(const r of sel)setFV(r.key,r.value);
+  for(const r of clears)setFV(r.key,emptyValOf(r.field));
   onMemoChange();
   closeModal('modal-import-text');
   renderMemoDetail();
-  showToast(`${sel.length}項目を取り込みました`);
+  showToast(`${sel.length}項目を取り込みました`+(clears.length?`・${clears.length}項目を空欄にしました`:''));
 }
 
 // ===== GROUPS =====
@@ -3582,6 +3620,21 @@ const idbPendingAll=()=>idbReq('pending','readonly',st=>st.getAll());
 const idbUnqueue=(key)=>idbReq('pending','readwrite',st=>st.delete(key));
 
 const COLS=['groups','formats','memos','folders'];
+const SYNC_MARK_KEY='chara_sync_mark';
+
+// まとめて1トランザクションで書き込み/削除（1件ずつだと非常に遅い）
+function idbBatch(puts,dels){
+  if((!puts||!puts.length)&&(!dels||!dels.length))return Promise.resolve();
+  return idbOpen().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction('entities','readwrite');
+    const st=tx.objectStore('entities');
+    for(const r of (puts||[]))st.put(r);
+    for(const k of (dels||[]))st.delete(k);
+    tx.oncomplete=()=>res();
+    tx.onerror=()=>rej(tx.error);
+    tx.onabort=()=>rej(tx.error);
+  }));
+}
 
 // IndexedDB → メモリキャッシュ
 async function loadFromIDB(){
@@ -3594,13 +3647,11 @@ async function loadFromIDB(){
     return true;
   }catch(e){ console.warn('IDB読込失敗',e); return false; }
 }
-// メモリキャッシュ → IndexedDB（全件書き込み）
+// メモリキャッシュ → IndexedDB（全件・1トランザクション）
 async function seedIDB(){
-  for(const c of COLS){
-    for(const obj of Object.values(_cache[c]||{})){
-      try{ await idbPutEntity(c,obj); }catch(e){ console.warn('IDB書込失敗',e); }
-    }
-  }
+  const rows=[];
+  for(const c of COLS)for(const obj of Object.values(_cache[c]||{}))rows.push({col:c,id:obj.id,data:obj});
+  try{ await idbBatch(rows,[]); }catch(e){ console.warn('IDB書込失敗',e); }
 }
 
 // 保留キューをFirebaseへ送信（オンライン時のみ・順番に）
@@ -3610,6 +3661,7 @@ async function flushPending(){
   if(navigator.onLine===false)return;
   if(!window._firebaseDB||!currentUser)return;
   _flushing=true;
+  let flushed=0;
   try{
     const items=((await idbPendingAll())||[]).sort((a,b)=>a.ts-b.ts);
     const db=window._firebaseDB;
@@ -3623,7 +3675,16 @@ async function flushPending(){
           await window._fbRemove(window._fbRef(db,`${it.col}/${it.id}`));
         }
         await idbUnqueue(it.key);
+        flushed++;
       }catch(e){ console.warn('同期失敗（後で再試行）',it.key,e); break; }
+    }
+    if(flushed){
+      // 「最後に書き込んだ時刻」マーカーを更新（起動時の全ダウンロード省略に使う）
+      try{
+        const mark=now();
+        await window._fbSet(window._fbRef(db,'meta/lastWrite'),mark);
+        localStorage.setItem(SYNC_MARK_KEY,mark);
+      }catch(e){}
     }
   }finally{ _flushing=false; updateSyncBadge(); }
 }
@@ -3656,9 +3717,18 @@ async function clearLocalCache(){
 async function syncWithFirebase(){
   await flushPending();
   const db=window._firebaseDB;
+  const pendingNow=(((await idbPendingAll())||[])).length;
+  // 変更マーカーが前回同期時と同じなら、全ダウンロードを丸ごと省略（通常起動はこれで一瞬）
+  try{
+    const ms=await window._fbGet(window._fbRef(db,'meta/lastWrite'));
+    const remoteMark=ms.exists()?String(ms.val()):'';
+    const localMark=localStorage.getItem(SYNC_MARK_KEY)||'';
+    if(remoteMark&&remoteMark===localMark&&!pendingNow)return false;
+  }catch(e){/* metaが読めない場合は従来通り全同期にフォールバック */}
   const snaps=await Promise.all(COLS.map(c=>window._fbGet(window._fbRef(db,c))));
   const pendingKeys=new Set((((await idbPendingAll())||[])).map(p=>p.key));
   let changed=false;
+  const puts=[],dels=[];
   for(let i=0;i<COLS.length;i++){
     const col=COLS[i];
     const rem=snaps[i].exists()?snaps[i].val():{};
@@ -3667,7 +3737,7 @@ async function syncWithFirebase(){
       const lobj=loc[id];
       if(!lobj||((robj.updatedAt||'')>(lobj.updatedAt||''))){
         loc[id]=robj;
-        try{ await idbPutEntity(col,robj); }catch(e){}
+        puts.push({col,id,data:robj});
         changed=true;
       }else if((lobj.updatedAt||'')>(robj.updatedAt||'')){
         try{ await idbQueue('put',col,id); }catch(e){}
@@ -3676,14 +3746,23 @@ async function syncWithFirebase(){
     for(const id of Object.keys(loc)){
       if(!(id in (rem||{}))&&!pendingKeys.has(col+'/'+id)){
         delete loc[id];
-        try{ await idbDeleteEntity(col,id); }catch(e){}
+        dels.push([col,id]);
         changed=true;
       }
     }
     _cache[col]=loc;
   }
+  try{ await idbBatch(puts,dels); }catch(e){ console.warn('IDB書込失敗',e); }
   _cacheLoaded=true;
   await flushPending();
+  // 同期済みマーカーを保存
+  try{
+    const ms2=await window._fbGet(window._fbRef(db,'meta/lastWrite'));
+    let rm=ms2.exists()?String(ms2.val()):'';
+    if(!rm){ rm=now(); await window._fbSet(window._fbRef(db,'meta/lastWrite'),rm); }
+    const cur=localStorage.getItem(SYNC_MARK_KEY)||'';
+    if(rm>cur)localStorage.setItem(SYNC_MARK_KEY,rm);
+  }catch(e){}
   return changed;
 }
 
@@ -3876,6 +3955,23 @@ function applyRoleUI(){
   if(!isAdmin)currentMode='view';
 }
 
+// 権限（admin/viewer）の確認。表示をブロックしないよう裏で行い、変わったときだけ再描画
+async function refreshRole(user){
+  try{
+    const snap=await window._fbGet(window._fbRef(window._firebaseDB,'config/adminUID'));
+    const adminUID=snap.exists()?snap.val():null;
+    const adm=(user.uid===adminUID);
+    localStorage.setItem('chara_is_admin',adm?'1':'0');
+    if(adm!==isAdmin){
+      isAdmin=adm;
+      applyRoleUI();
+      if(document.getElementById('screen-groups')?.classList.contains('active'))loadGroups();
+      if(document.getElementById('screen-memos')?.classList.contains('active'))renderMemoList(allMemos);
+      if(currentMemo&&document.getElementById('screen-memo-detail')?.classList.contains('active'))renderMemoDetail();
+    }
+  }catch(e){ console.warn('権限確認失敗（前回の権限のまま動作）',e); }
+}
+
 // ===== AUTH =====
 async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
@@ -3899,16 +3995,6 @@ async function init(){
   window._fbOnAuthStateChanged(window._firebaseAuth, async (user) => {
     if (user) {
       currentUser = user;
-      // adminUID取得
-      try {
-        const snap = await window._fbGet(window._fbRef(window._firebaseDB, 'config/adminUID'));
-        const adminUID = snap.exists() ? snap.val() : null;
-        isAdmin = (user.uid === adminUID);
-        if(!isAdmin)showToast('UID不一致: '+user.uid.slice(0,8));
-      } catch(e) {
-        isAdmin = false;
-        showToast('admin取得エラー: '+e.message);
-      }
 
       // アクセス時刻を更新（※データは消さない。ローカルが正本）
       localStorage.setItem('chara_last_access', Date.now().toString());
@@ -3916,9 +4002,11 @@ async function init(){
       // ブラウザにストレージの永続化を要求（勝手に消されにくくする）
       try{ if(navigator.storage&&navigator.storage.persist)navigator.storage.persist(); }catch(e){}
 
-      // 端末(IndexedDB)にデータがあれば即座に表示
+      // 端末(IndexedDB)にデータがあれば即座に表示（権限は前回のものを仮採用し、裏で確認）
       const hasLocal = await loadFromIDB();
       if(hasLocal){
+        isAdmin = localStorage.getItem('chara_is_admin')==='1';
+        refreshRole(user); // 待たない
         document.getElementById('loading').style.display='none';
         document.getElementById('login-screen').style.display='none';
         document.getElementById('app').style.display='flex';
@@ -3941,15 +4029,16 @@ async function init(){
       } else {
         // 端末にデータなし（初回・新端末）→ Firebaseから全て読んで端末に保存
         _syncPromise = null;
+        await refreshRole(user); // 初回はネット必須なので権限もここで確定
         await loadAllCache();
-        await seedIDB();
         document.getElementById('loading').style.display='none';
         document.getElementById('login-screen').style.display='none';
         document.getElementById('app').style.display='flex';
         applyRoleUI();
         showScreen('screen-groups');
         await loadGroups();
-        updateSyncBadge();
+        // 端末への書き込みは裏で（表示をブロックしない）
+        seedIDB().then(()=>updateSyncBadge()).catch(e=>console.warn(e));
       }
 
       // オンライン復帰・画面復帰時に未同期分を自動送信
