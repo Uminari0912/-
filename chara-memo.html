@@ -2431,7 +2431,7 @@ function switchOutputTab(tab){
     textArea.style.display='none';
     customArea.style.display='block';
     copyBtn.style.display='none';
-    if(mdBtn)mdBtn.style.display='none';
+    if(mdBtn)mdBtn.style.display='flex';
     genBtn.style.display='flex';
     customTextEl.style.display='none';
     renderCustomSelector();
@@ -2644,11 +2644,15 @@ function refreshCustomOutputIfShown(){
 // 表示中の出力を .md ファイルとして保存
 function downloadOutputMd(){
   const isCustom=currentOutputTab==='custom';
-  const el=isCustom?document.getElementById('output-text-custom'):document.getElementById('output-text');
-  let text=el?el.textContent:'';
-  if(isCustom&&(!el||el.style.display==='none'))text=buildCustomOutput();
-  if(!text||text==='（選択された項目がありません）'||text==='（出力対象の入力がありません）'){
-    showToast('出力する内容がありません');return;
+  let text;
+  if(isCustom){
+    text=buildCustomOutput(); // 常に現在のチェック状態から生成
+  }else{
+    const el=document.getElementById('output-text');
+    text=el?el.textContent:'';
+  }
+  if(!text||text==='（出力対象の入力がありません）'){
+    showToast(isCustom?'チェックされた項目に内容がありません':'出力する内容がありません');return;
   }
   const ev=outputTimepoint?(currentMemo.timeline||[]).find(e=>e.id===outputTimepoint):null;
   const safe=n=>String(n||'').replace(/[\\\/:*?"<>|\n]/g,'_').trim().slice(0,40);
@@ -2664,8 +2668,14 @@ function downloadOutputMd(){
 
 async function copyOutput(){
   const isCustom=currentOutputTab==='custom';
-  const el=isCustom?document.getElementById('output-text-custom'):document.getElementById('output-text');
-  const text=el?el.textContent:'';
+  let text;
+  if(isCustom){
+    text=buildCustomOutput();
+  }else{
+    const el=document.getElementById('output-text');
+    text=el?el.textContent:'';
+  }
+  if(!text){showToast('コピーする内容がありません');return;}
   try{await navigator.clipboard.writeText(text);showToast('コピーしました');}
   catch{showToast('コピーに失敗しました');}
 }
