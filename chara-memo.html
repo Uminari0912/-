@@ -381,6 +381,7 @@ body.viewer-mode .image-thumb {
     <button class="btn-icon" id="undo-btn" onclick="undoMemo()" title="元に戻す" style="opacity:0.3;font-size:16px">↩</button>
     <button class="btn-icon" id="redo-btn" onclick="redoMemo()" title="やり直す" style="opacity:0.3;font-size:16px">↪</button>
     <button class="btn-icon" id="btn-history" onclick="openHistoryModal()" title="変更履歴">📋</button>
+    <button class="btn-icon" id="btn-import-text" onclick="openImportTextModal()" title="テキストから取り込み">📥</button>
     <button class="btn-icon" id="btn-output" onclick="openOutputModal()" title="出力">↗</button>
   </div>
   <div class="scroll-area" id="memo-detail-body"></div>
@@ -711,6 +712,29 @@ body.viewer-mode .image-thumb {
     <div class="modal-handle"></div>
     <div class="modal-header"><span>関連キャラを追加</span><button class="btn-icon" onclick="closeModal('modal-link-select')">✕</button></div>
     <div class="modal-body"><div id="link-select-list"></div></div>
+  </div>
+</div>
+
+<!-- IMPORT TEXT MODAL -->
+<div class="modal-overlay" id="modal-import-text">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span>テキストから取り込み</span><button class="btn-icon" onclick="closeModal('modal-import-text')">✕</button></div>
+    <div class="modal-body">
+      <div id="import-step1">
+        <p style="color:var(--text-2);font-size:12px;line-height:1.7;margin-bottom:10px">出力と同じ形式のテキスト（.md可）を貼り付けてください。<br>【身長】158cm のように項目名がフォーマットと同じなら自動で埋まります。■セクション名 の行はあってもなくてもOK。</p>
+        <textarea class="field-textarea" id="import-text-input" style="min-height:200px;font-size:13px" placeholder="■ 基本情報&#10;【名前】ルナミー&#10;【身長】&#10;158cm&#10;【性格】&#10;明るいが芯は頑固..."></textarea>
+        <button class="btn btn-secondary btn-sm btn-full" style="margin-top:8px" onclick="document.getElementById('import-file-input').click()">📄 ファイルを読み込む（.txt / .md）</button>
+        <input type="file" id="import-file-input" accept=".txt,.md,text/plain,text/markdown" style="display:none" onchange="onImportFilePicked(this)">
+      </div>
+      <div id="import-step2" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" id="btn-import-cancel" onclick="closeModal('modal-import-text')">キャンセル</button>
+      <button class="btn btn-primary flex-1" id="btn-import-parse" onclick="parseImportPreview()">解析する</button>
+      <button class="btn btn-secondary flex-1" id="btn-import-back" style="display:none" onclick="showImportStep(1)">戻る</button>
+      <button class="btn btn-primary flex-1" id="btn-import-apply" style="display:none" onclick="applyImport()">取り込む</button>
+    </div>
   </div>
 </div>
 
@@ -1068,6 +1092,177 @@ function deleteEvent(id){
     onMemoChange();renderMemoDetail();
     showToast('削除しました');
   });
+}
+
+// ===== テキスト取り込み =====
+let importParsed=null;
+function openImportTextModal(){
+  if(!isAdmin){showToast('編集権限がありません');return;}
+  if(!currentMemo||!currentFormat)return;
+  if(currentMemo.locked){showToast('ロック中のメモには取り込めません');return;}
+  importParsed=null;
+  document.getElementById('import-text-input').value='';
+  showImportStep(1);
+  openModal('modal-import-text');
+}
+function showImportStep(n){
+  document.getElementById('import-step1').style.display=n===1?'block':'none';
+  document.getElementById('import-step2').style.display=n===2?'block':'none';
+  document.getElementById('btn-import-cancel').style.display=n===1?'':'none';
+  document.getElementById('btn-import-parse').style.display=n===1?'':'none';
+  document.getElementById('btn-import-back').style.display=n===2?'':'none';
+  document.getElementById('btn-import-apply').style.display=n===2?'':'none';
+}
+function onImportFilePicked(input){
+  const f=input.files&&input.files[0];
+  if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{document.getElementById('import-text-input').value=r.result;showToast('読み込みました。「解析する」を押してください');};
+  r.onerror=()=>showToast('ファイルの読み込みに失敗しました');
+  r.readAsText(f);
+  input.value='';
+}
+function cleanImportLine(l){
+  // md装飾（見出し#・引用>・箇条書き・太字**）を剥がす
+  return String(l).replace(/^[\s>#\-*•・]+/,'').replace(/\*\*/g,'').trim();
+}
+// フォーマット定義を頼りに 【項目名】/■セクション名 を解析する
+function parseImportText(raw){
+  const fmt=currentFormat;
+  const sections=[...fmt.sections].sort((a,b)=>a.order-b.order);
+  const fieldMap=new Map();
+  for(const sec of sections)for(const f of [...sec.fields].sort((a,b)=>a.order-b.order)){
+    if(f.type==='image')continue;
+    const e={key:`${sec.sectionId}_${f.fieldId}`,field:f,sec};
+    if(!fieldMap.has(f.name))fieldMap.set(f.name,[]);
+    fieldMap.get(f.name).push(e);
+  }
+  const secByName=new Map(sections.map(sec=>[sec.name,sec]));
+  const lines=String(raw||'').replace(/\r\n?/g,'\n').split('\n');
+  const found=[],unmatched=[];
+  let curSec=null,cur=null;
+  const flush=()=>{if(!cur)return;found.push({entry:cur.entry,text:cur.buf.join('\n').trim()});cur=null;};
+  for(const raw0 of lines){
+    const c=cleanImportLine(raw0);
+    let m=c.match(/^[■◆●]\s*(.+)$/);
+    if(m&&secByName.has(m[1].trim())){flush();curSec=secByName.get(m[1].trim());continue;}
+    m=c.match(/^[【\[［]([^】\]］]+)[】\]］]\s*(.*)$/);
+    if(m){
+      const name=m[1].trim(),rest=m[2].trim();
+      if(name==='時点'){flush();continue;}
+      const cands=fieldMap.get(name);
+      if(cands){
+        flush();
+        let entry=cands[0];
+        if(cands.length>1&&curSec){const hit=cands.find(e=>e.sec.sectionId===curSec.sectionId);if(hit)entry=hit;}
+        curSec=entry.sec;
+        cur={entry,buf:rest?[rest]:[]};
+        continue;
+      }
+      // フィールド名に一致しない【】: テキスト・リスト項目の処理中なら本文として扱う（リストのアイテム名など）
+      if(cur&&cur.entry.field.type!=='index'){cur.buf.push(raw0);continue;}
+      flush();
+      unmatched.push(name);
+      continue;
+    }
+    if(cur)cur.buf.push(raw0);
+  }
+  flush();
+  const results=[];
+  for(const {entry,text} of found){
+    const f=entry.field;
+    let value=null,note='',skip=false;
+    if(f.type==='text'){
+      value=text;
+      if(!text)skip=true;
+    }else if(f.type==='index'){
+      const opts=f.indexOptions||[];
+      const toks=text.split(/[、,\/・;；\s]+/).map(t=>t.trim()).filter(Boolean);
+      const hit=[],miss=[];
+      for(const t of toks)(opts.includes(t)?hit:miss).push(t);
+      let v=[...new Set(hit)];
+      if(!f.multiSelect&&v.length>1){note='単一選択のため最初の1つのみ採用';v=v.slice(0,1);}
+      if(miss.length)note=(note?note+' / ':'')+'選択肢にないため無視: '+miss.join('、');
+      value=v;
+      if(!v.length)skip=true;
+    }else if(f.type==='list'){
+      const items=[];let it=null;
+      for(const l of text.split('\n')){
+        const cl=cleanImportLine(l);
+        const mm=cl.match(/^[【\[［]([^】\]］]+)[】\]］]\s*(.*)$/);
+        if(mm){
+          if(it)items.push(it);
+          const nm=mm[1].trim();
+          it={name:nm==='名称未設定'?'':nm,text:mm[2].trim()};
+        }else if(it){
+          it.text=(it.text?it.text+'\n':'')+l;
+        }else if(cl){
+          it={name:'',text:l.trim()};
+        }
+      }
+      if(it)items.push(it);
+      items.forEach(i=>i.text=(i.text||'').trim());
+      value=items.filter(i=>i.name||i.text);
+      if(!value.length)skip=true;
+    }else{skip=true;}
+    if(skip)continue;
+    const dup=results.findIndex(r=>r.key===entry.key);
+    if(dup>=0)results.splice(dup,1); // 同じ項目が2回出たら後勝ち
+    results.push({key:entry.key,field:f,secName:entry.sec.name,value,note});
+  }
+  return {results,unmatched:[...new Set(unmatched)]};
+}
+function importPreviewVal(r){
+  if(r.field.type==='text')return r.value;
+  if(r.field.type==='index')return r.value.join('、');
+  if(r.field.type==='list')return r.value.map(i=>`【${i.name||'名称未設定'}】${i.text?' '+i.text.split('\n')[0]:''}`).join('\n');
+  return '';
+}
+function parseImportPreview(){
+  const raw=document.getElementById('import-text-input').value;
+  if(!raw.trim()){showToast('テキストを貼り付けてください');return;}
+  const {results,unmatched}=parseImportText(raw);
+  importParsed=results;
+  const mv=getMergedValues(currentMemo,currentTimepoint);
+  let html='';
+  if(currentTimepoint){
+    html+=`<div style="margin-bottom:10px;padding:8px 12px;background:rgba(224,148,64,0.08);border:1px solid rgba(224,148,64,0.3);border-radius:var(--radius-sm);font-size:12px;color:var(--warning)">「${esc(timepointLabel(currentMemo,currentTimepoint))}」の上書きとして取り込まれます</div>`;
+  }
+  if(!results.length){
+    html+=`<div class="empty" style="padding:30px 0"><div class="empty-icon">🔍</div><div class="empty-text">一致する項目が見つかりませんでした<br>項目名が【身長】のように<br>フォーマットと同じ名前か確認してください</div></div>`;
+  }else{
+    html+=`<div style="font-size:12px;color:var(--text-2);margin-bottom:4px">${results.length}項目が見つかりました。取り込むものを選んでください。</div>`;
+    html+=results.map((r,i)=>{
+      const curVal=mv[r.key];
+      const has=!isEmptyVal(r.field,curVal,r.key);
+      return `<label style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">
+        <input type="checkbox" checked data-imp="${i}" style="margin-top:3px;accent-color:var(--accent)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:var(--text-2);margin-bottom:2px">${esc(r.secName)} › ${esc(r.field.name)}${has?` <span style="color:var(--warning)">既存の値を上書き</span>`:''}</div>
+          <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:96px;overflow:hidden">${esc(importPreviewVal(r))}</div>
+          ${has?`<div style="font-size:11px;color:var(--text-2);margin-top:3px">現在: ${esc(String(displayVal(r.field,curVal)||'').slice(0,40))}</div>`:''}
+          ${r.note?`<div style="font-size:11px;color:var(--warning);margin-top:3px">⚠ ${esc(r.note)}</div>`:''}
+        </div>
+      </label>`;
+    }).join('');
+  }
+  if(unmatched.length){
+    html+=`<div style="margin-top:12px;font-size:12px;color:var(--text-2);line-height:1.6">フォーマットに無いため無視した項目：${unmatched.map(u=>esc(u)).join('、')}</div>`;
+  }
+  document.getElementById('import-step2').innerHTML=html;
+  showImportStep(2);
+}
+function applyImport(){
+  if(!importParsed||!currentMemo)return;
+  const checks=document.querySelectorAll('#import-step2 input[data-imp]');
+  const sel=[...checks].filter(c=>c.checked).map(c=>importParsed[+c.dataset.imp]).filter(Boolean);
+  if(!sel.length){showToast('取り込む項目を選択してください');return;}
+  pushUndoStack();
+  for(const r of sel)setFV(r.key,r.value);
+  onMemoChange();
+  closeModal('modal-import-text');
+  renderMemoDetail();
+  showToast(`${sel.length}項目を取り込みました`);
 }
 
 // ===== GROUPS =====
@@ -2196,6 +2391,31 @@ function onOutputSetChange(){
   document.getElementById('output-text').textContent=out||'（出力対象の入力がありません）';
 }
 
+// 語頭・語尾で使える変数
+function outputVars(){
+  const ev=outputTimepoint?(currentMemo.timeline||[]).find(e=>e.id===outputTimepoint):null;
+  return {
+    '時点': ev?ev.name+'の後':'基本',
+    '出来事': ev?ev.name:'',
+    '時点説明': ev?(ev.note||''):'',
+    '名前': currentMemo.title||'',
+    'キャラ名': currentMemo.title||''
+  };
+}
+function applyOutputVars(text){
+  const vars=outputVars();
+  const isBase=!outputTimepoint;
+  const out=[];
+  for(const line of String(text).split('\n')){
+    // 「基本」出力では、出来事前提の変数を含む行は行ごと省く
+    if(isBase&&/%(出来事|時点説明)%/.test(line))continue;
+    const had=/%(時点説明|時点|出来事|キャラ名|名前)%/.test(line);
+    const rep=line.replace(/%(時点説明|時点|出来事|キャラ名|名前)%/g,(_,k)=>vars[k]??'');
+    if(had&&!rep.trim())continue; // 変数が空で行が空になったら行ごと省く
+    out.push(rep);
+  }
+  return out.join('\n');
+}
 function buildOutput(mode,setIdx=null){
   const m=currentMemo;
   const mv=getMergedValues(m,outputTimepoint);
@@ -2219,11 +2439,19 @@ function buildOutput(mode,setIdx=null){
     if(secOut)out+=`■ ${sec.name}\n${secOut}\n`;
   }
   let result=out.trim();
-  if(result)result=outputTimepointHeader()+result;
-  // 語頭・語尾を追加
+  // 語頭・語尾に時点変数が使われている場合は自動の【時点】ヘッダを付けない
+  const setUsesTp=!!(set&&/%(時点|出来事|時点説明)%/.test(String(set.header||'')+String(set.footer||'')));
+  if(result&&!setUsesTp)result=outputTimepointHeader()+result;
+  // 語頭・語尾を追加（%変数%を置換）
   if(set){
-    if(set.useHeader&&set.header&&set.header.trim())result=set.header.trim()+'\n\n'+result;
-    if(set.useFooter&&set.footer&&set.footer.trim())result=result+'\n\n'+set.footer.trim();
+    if(set.useHeader&&set.header&&set.header.trim()){
+      const h=applyOutputVars(set.header.trim());
+      if(h.trim())result=h+'\n\n'+result;
+    }
+    if(set.useFooter&&set.footer&&set.footer.trim()){
+      const f=applyOutputVars(set.footer.trim());
+      if(f.trim())result=result+'\n\n'+f;
+    }
   }
   return result;
 }
@@ -2620,6 +2848,9 @@ function renderPendingOutputSets(){
       <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer" onclick="toggleOutputSetCollapse(${si})">
         <span style="font-size:12px;color:var(--text-2);transition:transform 0.2s;display:inline-block" id="oset-arrow-${si}">${si in outputSetCollapsed && outputSetCollapsed[si] ? '▸' : '▾'}</span>
         <span style="font-size:13px;font-weight:600;flex:1;color:var(--text-0)">${esc(set.name)}</span>
+        <button class="btn-icon" style="width:26px;height:26px;font-size:11px" title="コピー" onclick="event.stopPropagation();duplicateOutputSet(${si})">📋</button>
+        <button class="btn-icon" style="width:26px;height:26px;font-size:11px${si===0?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveOutputSet(${si},-1)">↑</button>
+        <button class="btn-icon" style="width:26px;height:26px;font-size:11px${si===pendingOutputSets.length-1?';opacity:0.2;pointer-events:none':''}" onclick="event.stopPropagation();moveOutputSet(${si},1)">↓</button>
         <button class="btn-icon" style="width:26px;height:26px;font-size:11px" onclick="event.stopPropagation();renameOutputSet(${si})">✏</button>
         <button class="btn-icon" style="width:26px;height:26px;font-size:11px;color:var(--danger)" onclick="event.stopPropagation();removeOutputSet(${si})">✕</button>
       </div>
@@ -2642,6 +2873,7 @@ function renderPendingOutputSets(){
         </div>
         ${hasFooter?`<textarea class="field-textarea" style="min-height:60px;font-size:13px" placeholder="出力の末尾に追加するテキスト..." oninput="updateOutputSetText(${si},'footer',this.value)">${esc(set.footer||'')}</textarea>`:''}
       </div>
+      <div style="font-size:11px;color:var(--text-2);line-height:1.8;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:10px">語頭・語尾で使える変数：<br>%時点% → 父の死の後（基本のときは「基本」）<br>%出来事% → 父の死<br>%時点説明% → 出来事の説明文<br>%名前% → キャラ名（メモのタイトル）<br><span style="opacity:0.8">※「基本」で出力するとき、%出来事%・%時点説明%を含む行はまるごと省かれます</span></div>
       <div style="font-size:11px;color:var(--text-2);margin-bottom:6px;letter-spacing:0.05em">出力項目</div>
       <div style="max-height:150px;overflow-y:auto">${fieldChecks||'<p style="color:var(--text-2);font-size:12px">大項目・項目を先に追加してください</p>'}</div>
       </div>
@@ -2687,6 +2919,33 @@ function renameOutputSet(si){
 }
 function removeOutputSet(si){
   pendingOutputSets.splice(si,1);
+  // 折りたたみ状態のインデックスを詰める
+  const nc={};
+  for(const [k,v] of Object.entries(outputSetCollapsed)){const i=+k;if(i===si)continue;nc[i>si?i-1:i]=v;}
+  outputSetCollapsed=nc;
+  renderPendingOutputSets();
+}
+function duplicateOutputSet(si){
+  const src=pendingOutputSets[si];
+  if(!src)return;
+  const copy=JSON.parse(JSON.stringify(src));
+  copy.name=(src.name||'出力セット')+' のコピー';
+  pendingOutputSets.splice(si+1,0,copy);
+  // 折りたたみ状態のインデックスをずらし、コピーは開いた状態に
+  const nc={};
+  for(const [k,v] of Object.entries(outputSetCollapsed)){const i=+k;nc[i>si?i+1:i]=v;}
+  nc[si+1]=false;
+  outputSetCollapsed=nc;
+  renderPendingOutputSets();
+  showToast('コピーしました');
+}
+function moveOutputSet(si,dir){
+  const j=si+dir;
+  if(j<0||j>=pendingOutputSets.length)return;
+  [pendingOutputSets[si],pendingOutputSets[j]]=[pendingOutputSets[j],pendingOutputSets[si]];
+  const a=outputSetCollapsed[si],b=outputSetCollapsed[j];
+  if(b===undefined)delete outputSetCollapsed[si];else outputSetCollapsed[si]=b;
+  if(a===undefined)delete outputSetCollapsed[j];else outputSetCollapsed[j]=a;
   renderPendingOutputSets();
 }
 
@@ -3287,75 +3546,158 @@ function openNewMemoModalInFolder(){
   openNewMemoModal(currentFolderId);
 }
 
-// ===== LOCAL CACHE =====
-const LOCAL_CACHE_KEY = 'chara_memo_local_cache_v1';
+// ===== ローカル永続化（IndexedDB）=====
+// データはまず端末のIndexedDBに保存（画像込み・即時）。Firebaseはバックアップ用ミラーとして
+// 裏で同期する。書き込みは「保留キュー」に積み、オンライン時に自動送信するので失われない。
+const IDB_NAME='charaMemoDB';
+let _idb=null;
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    if(_idb)return res(_idb);
+    if(!window.indexedDB)return rej(new Error('IndexedDB非対応'));
+    const req=indexedDB.open(IDB_NAME,1);
+    req.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains('entities'))db.createObjectStore('entities',{keyPath:['col','id']});
+      if(!db.objectStoreNames.contains('pending'))db.createObjectStore('pending',{keyPath:'key'});
+    };
+    req.onsuccess=()=>{_idb=req.result;_idb.onclose=()=>{_idb=null;};res(_idb);};
+    req.onerror=()=>rej(req.error);
+  });
+}
+function idbReq(store,mode,fn){
+  return idbOpen().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(store,mode);
+    const r=fn(tx.objectStore(store));
+    tx.oncomplete=()=>res(r?r.result:undefined);
+    tx.onerror=()=>rej(tx.error);
+    tx.onabort=()=>rej(tx.error);
+  }));
+}
+const idbPutEntity=(col,obj)=>idbReq('entities','readwrite',st=>st.put({col,id:obj.id,data:obj}));
+const idbDeleteEntity=(col,id)=>idbReq('entities','readwrite',st=>st.delete([col,id]));
+const idbAllEntities=()=>idbReq('entities','readonly',st=>st.getAll());
+const idbQueue=(op,col,id)=>idbReq('pending','readwrite',st=>st.put({key:col+'/'+id,op,col,id,ts:Date.now()}));
+const idbPendingAll=()=>idbReq('pending','readonly',st=>st.getAll());
+const idbUnqueue=(key)=>idbReq('pending','readwrite',st=>st.delete(key));
 
-function saveLocalCache(){
-  const buildCache = (withCover) => {
-    const memosLite = {};
-    for(const [id, m] of Object.entries(_cache.memos||{})){
-      const {coverImage, ...meta} = m;
-      // fieldValuesから画像（base64）だけ除いてキャッシュ
-      const filteredFV = {};
-      for(const [k, v] of Object.entries(m.fieldValues||{})){
-        if(typeof v==='string' && v.startsWith('data:')) continue; // 画像スキップ
-        if(Array.isArray(v)){
-          filteredFV[k]=v.filter(item=>!(typeof item==='string'&&item.startsWith('data:')));
-        } else {
-          filteredFV[k]=v;
+const COLS=['groups','formats','memos','folders'];
+
+// IndexedDB → メモリキャッシュ
+async function loadFromIDB(){
+  try{
+    const rows=await idbAllEntities();
+    if(!rows||!rows.length)return false;
+    for(const c of COLS)_cache[c]={};
+    for(const r of rows){ if(!_cache[r.col])_cache[r.col]={}; _cache[r.col][r.id]=r.data; }
+    _cacheLoaded=true;
+    return true;
+  }catch(e){ console.warn('IDB読込失敗',e); return false; }
+}
+// メモリキャッシュ → IndexedDB（全件書き込み）
+async function seedIDB(){
+  for(const c of COLS){
+    for(const obj of Object.values(_cache[c]||{})){
+      try{ await idbPutEntity(c,obj); }catch(e){ console.warn('IDB書込失敗',e); }
+    }
+  }
+}
+
+// 保留キューをFirebaseへ送信（オンライン時のみ・順番に）
+let _flushing=false;
+async function flushPending(){
+  if(_flushing)return;
+  if(navigator.onLine===false)return;
+  if(!window._firebaseDB||!currentUser)return;
+  _flushing=true;
+  try{
+    const items=((await idbPendingAll())||[]).sort((a,b)=>a.ts-b.ts);
+    const db=window._firebaseDB;
+    for(const it of items){
+      try{
+        if(it.op==='put'){
+          const obj=_cache[it.col]?.[it.id];
+          if(obj===undefined){ await idbUnqueue(it.key); continue; }
+          await window._fbSet(window._fbRef(db,`${it.col}/${it.id}`),obj);
+        }else{
+          await window._fbRemove(window._fbRef(db,`${it.col}/${it.id}`));
         }
+        await idbUnqueue(it.key);
+      }catch(e){ console.warn('同期失敗（後で再試行）',it.key,e); break; }
+    }
+  }finally{ _flushing=false; updateSyncBadge(); }
+}
+async function updateSyncBadge(){
+  try{
+    const n=((await idbPendingAll())||[]).length;
+    const b=document.getElementById('btn-cache');
+    if(b){ b.textContent=n?'⏳':'💾'; b.title=n?`未同期 ${n}件（オンラインで自動送信）`:'保存済み・同期済み'; }
+  }catch(e){}
+}
+
+// 💾ボタン: 全件をIndexedDBに書き直し＋未同期分を送信
+async function saveLocalCache(){
+  try{
+    await seedIDB();
+    await flushPending();
+    const n=((await idbPendingAll())||[]).length;
+    showToast(n?`💾 端末に保存済み（未同期 ${n}件）`:'💾 端末に保存・同期済み');
+  }catch(e){ showToast('保存に失敗: '+e.message); }
+}
+async function clearLocalCache(){
+  try{ await idbReq('entities','readwrite',st=>st.clear()); await idbReq('pending','readwrite',st=>st.clear()); }catch(e){}
+  try{ localStorage.removeItem('chara_memo_local_cache_v1'); }catch(e){}
+}
+
+// Firebaseと双方向マージ同期
+// ・リモートの方が新しい(updatedAt) → ローカルへ取り込み
+// ・ローカルの方が新しい → 送信キューへ
+// ・ローカルにあってリモートに無い＆送信待ちでない → 他端末で削除されたとみなしローカルも削除
+async function syncWithFirebase(){
+  await flushPending();
+  const db=window._firebaseDB;
+  const snaps=await Promise.all(COLS.map(c=>window._fbGet(window._fbRef(db,c))));
+  const pendingKeys=new Set((((await idbPendingAll())||[])).map(p=>p.key));
+  let changed=false;
+  for(let i=0;i<COLS.length;i++){
+    const col=COLS[i];
+    const rem=snaps[i].exists()?snaps[i].val():{};
+    const loc=_cache[col]||{};
+    for(const [id,robj] of Object.entries(rem||{})){
+      const lobj=loc[id];
+      if(!lobj||((robj.updatedAt||'')>(lobj.updatedAt||''))){
+        loc[id]=robj;
+        try{ await idbPutEntity(col,robj); }catch(e){}
+        changed=true;
+      }else if((lobj.updatedAt||'')>(robj.updatedAt||'')){
+        try{ await idbQueue('put',col,id); }catch(e){}
       }
-      memosLite[id] = {...meta, fieldValues: filteredFV, ...(withCover ? {coverImage} : {})};
     }
-    return JSON.stringify({
-      savedAt: Date.now(),
-      groups: _cache.groups,
-      formats: _cache.formats,
-      folders: _cache.folders,
-      memos: memosLite
-    });
-  };
-  try {
-    localStorage.setItem(LOCAL_CACHE_KEY, buildCache(true));
-    showToast('💾 キャッシュを保存しました');
-  } catch(e1) {
-    try {
-      localStorage.setItem(LOCAL_CACHE_KEY, buildCache(false));
-      showToast('💾 キャッシュ保存（アイコン除く）');
-    } catch(e2) {
-      showToast('容量不足でキャッシュできません');
+    for(const id of Object.keys(loc)){
+      if(!(id in (rem||{}))&&!pendingKeys.has(col+'/'+id)){
+        delete loc[id];
+        try{ await idbDeleteEntity(col,id); }catch(e){}
+        changed=true;
+      }
     }
+    _cache[col]=loc;
   }
-}
-
-function loadLocalCache(){
-  try {
-    const raw = localStorage.getItem(LOCAL_CACHE_KEY);
-    if(!raw) return false;
-    const data = JSON.parse(raw);
-    if(!data.savedAt) return false;
-    _cache.groups = data.groups || {};
-    _cache.formats = data.formats || {};
-    _cache.folders = data.folders || {};
-    _cache.memos = data.memos || {};
-    _cacheLoaded = true;
-    return data;
-  } catch(e) {
-    return false;
-  }
-}
-
-function clearLocalCache(){
-  localStorage.removeItem(LOCAL_CACHE_KEY);
+  _cacheLoaded=true;
+  await flushPending();
+  return changed;
 }
 
 async function forceReloadFromFirebase(){
   showToast('🔄 最新データを取得中...');
-  _cacheLoaded = false;
-  await loadAllCache();
-  saveLocalCache();
-  await loadGroups();
-  showToast('✅ 更新完了');
+  try{
+    await flushPending();
+    await loadAllCache();      // Firebaseから全件取得して_cacheを上書き
+    await clearLocalCache();
+    await seedIDB();
+    await loadGroups();
+    updateSyncBadge();
+    showToast('✅ 更新完了');
+  }catch(e){ showToast('取得に失敗: '+e.message); }
 }
 
 
@@ -3477,18 +3819,30 @@ async function fbGet(store, key) {
   return val;
 }
 async function fbPut(store, val) {
-  // キャッシュ更新
+  // メモリキャッシュ更新
   if(!_cache[store]) _cache[store]={};
   _cache[store][val.id] = val;
-  // Firebaseに非同期書き込み（待たない）
-  const db = window._firebaseDB;
-  window._fbSet(window._fbRef(db, `${store}/${val.id}`), val);
+  // 端末(IndexedDB)へ即保存＋送信キューへ（ここまで完了すれば消えない）
+  try{
+    await idbPutEntity(store, val);
+    await idbQueue('put', store, val.id);
+  }catch(e){
+    console.warn('IDB保存失敗', e);
+    // 端末保存に失敗した場合はFirebaseへ直接書き込みを試みる
+    try{ window._fbSet(window._fbRef(window._firebaseDB, `${store}/${val.id}`), val); }catch(e2){}
+  }
+  flushPending(); // バックグラウンドでFirebaseへ（待たない）
   return val.id;
 }
 async function fbDelete(store, key) {
   if(_cache[store]) delete _cache[store][key];
-  const db = window._firebaseDB;
-  window._fbRemove(window._fbRef(db, `${store}/${key}`));
+  try{
+    await idbDeleteEntity(store, key);
+    await idbQueue('delete', store, key);
+  }catch(e){
+    try{ window._fbRemove(window._fbRef(window._firebaseDB, `${store}/${key}`)); }catch(e2){}
+  }
+  flushPending();
 }
 
 // ===== ROLE UI =====
@@ -3502,6 +3856,8 @@ function applyRoleUI(){
   // 出力ボタン
   const btnOutput=document.getElementById('btn-output');
   if(btnOutput)btnOutput.style.display=isAdmin?'flex':'none';
+  const btnImport=document.getElementById('btn-import-text');
+  if(btnImport)btnImport.style.display=isAdmin?'flex':'none';
   // バックアップ・フォーマット管理
   const btnBackup=document.getElementById('btn-backup');
   const btnFormats=document.getElementById('btn-formats');
@@ -3554,50 +3910,51 @@ async function init(){
         showToast('admin取得エラー: '+e.message);
       }
 
-      // 1週間アクセスなしチェック
-      const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-      const lastAccess = parseInt(localStorage.getItem('chara_last_access') || '0');
-      if(lastAccess && Date.now() - lastAccess > WEEK_MS){
-        // 1週間以上アクセスなし → ログアウト＆キャッシュ削除
-        clearLocalCache();
-        localStorage.removeItem('chara_last_access');
-        await window._fbSignOut(window._firebaseAuth);
-        return;
-      }
-      // アクセス時刻を更新
+      // アクセス時刻を更新（※データは消さない。ローカルが正本）
       localStorage.setItem('chara_last_access', Date.now().toString());
 
-      // ローカルキャッシュがあれば即座に表示
-      const cached = loadLocalCache();
-      if(cached){
+      // ブラウザにストレージの永続化を要求（勝手に消されにくくする）
+      try{ if(navigator.storage&&navigator.storage.persist)navigator.storage.persist(); }catch(e){}
+
+      // 端末(IndexedDB)にデータがあれば即座に表示
+      const hasLocal = await loadFromIDB();
+      if(hasLocal){
         document.getElementById('loading').style.display='none';
         document.getElementById('login-screen').style.display='none';
         document.getElementById('app').style.display='flex';
         applyRoleUI();
         showScreen('screen-groups');
         await loadGroups();
-        // バックグラウンドでFirebaseと同期（完了後にリストも更新）
-        _syncPromise = loadAllCache().then(async ()=>{
-          saveLocalCache(); // 同期完了後にキャッシュ更新
-          await loadGroups();
-          await loadMemos();
-          if(currentFolderId && document.getElementById('screen-folder')?.classList.contains('active')){
-            loadFolderScreen(currentFolderId);
+        updateSyncBadge();
+        // バックグラウンドでFirebaseとマージ同期（新しい方を採用）
+        _syncPromise = syncWithFirebase().then(async (changed)=>{
+          if(changed){
+            await loadGroups();
+            await loadMemos();
+            if(currentFolderId && document.getElementById('screen-folder')?.classList.contains('active')){
+              loadFolderScreen(currentFolderId);
+            }
           }
+          updateSyncBadge();
           _syncPromise = null;
-        });
+        }).catch(e=>{ console.warn('同期失敗（オフライン?）',e); _syncPromise=null; });
       } else {
-        // キャッシュなし → Firebaseから全て読む
+        // 端末にデータなし（初回・新端末）→ Firebaseから全て読んで端末に保存
         _syncPromise = null;
         await loadAllCache();
-        saveLocalCache(); // 初回ロード後に自動保存
+        await seedIDB();
         document.getElementById('loading').style.display='none';
         document.getElementById('login-screen').style.display='none';
         document.getElementById('app').style.display='flex';
         applyRoleUI();
         showScreen('screen-groups');
         await loadGroups();
+        updateSyncBadge();
       }
+
+      // オンライン復帰・画面復帰時に未同期分を自動送信
+      window.addEventListener('online',()=>flushPending());
+      document.addEventListener('visibilitychange',()=>{ if(!document.hidden)flushPending(); });
     } else {
       currentUser = null;
       isAdmin = false;
