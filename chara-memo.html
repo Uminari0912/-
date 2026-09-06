@@ -519,6 +519,7 @@ body.viewer-mode .image-thumb {
     <div class="modal-handle"></div>
     <div class="modal-header"><span>出力</span><button class="btn-icon" onclick="closeModal('modal-output')">✕</button></div>
     <div class="modal-body" style="padding-top:4px">
+      <div id="out-timepoint-wrap"></div>
       <!-- モード切替 -->
       <div style="display:flex;gap:6px;margin-bottom:12px">
         <button class="btn btn-sm flex-1" id="out-tab-format" onclick="switchOutputTab('format')" style="background:var(--accent);color:#fff;border:none">フォーマット</button>
@@ -713,6 +714,23 @@ body.viewer-mode .image-thumb {
   </div>
 </div>
 
+<!-- EVENT MODAL -->
+<div class="modal-overlay" id="modal-event">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><span id="modal-event-title">出来事を追加</span><button class="btn-icon" onclick="closeModal('modal-event')">✕</button></div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">出来事</label><input class="field-input" type="text" id="event-name-input" placeholder="例：親が亡くなった、親友が消えた"></div>
+      <div class="field-group"><label class="field-label">説明 <span style="color:var(--text-2);font-size:12px;text-transform:none">（省略可）</span></label><textarea class="field-textarea" id="event-note-input" style="min-height:70px" placeholder="何があったか、どう変わったか..."></textarea></div>
+      <p style="color:var(--text-2);font-size:12px;line-height:1.6">追加すると「〇〇の後」の時点を選べるようになり、変わる項目だけ上書きできます。</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary flex-1" onclick="closeModal('modal-event')">キャンセル</button>
+      <button class="btn btn-primary flex-1" onclick="saveEvent()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- HISTORY MODAL -->
 <div class="modal-overlay" id="modal-history">
   <div class="modal">
@@ -744,6 +762,10 @@ let editingSectionIdx=null,editingFieldIdx=null;
 let autosaveTimer=null,importMode=null,pendingImageKey=null;
 let lightboxImages=[],lightboxIdx=0;
 let dragSrcIdx=null;
+// 時点（キャラ別タイムライン）: null=基本, それ以外=eventId
+let currentTimepoint=null;
+let outputTimepoint=null;
+let editingEventId=null;
 // Undo/Redo
 let undoStack=[]; // [{fieldValues, title}]
 let redoStack=[];
@@ -788,18 +810,19 @@ function updateEmptyUI(key){
   const sec=currentFormat.sections.find(s=>s.sectionId===secId);
   if(!sec)return;
   const sid=`sec_${secId}`;
+  const mv=getMergedValues(currentMemo,currentTimepoint);
   // フィールドヘッダー更新
   const fhdr=document.getElementById(`fhdr_${key}`);
   const field=sec.fields.find(f=>`${sec.sectionId}_${f.fieldId}`===key);
   if(fhdr&&field){
-    const isEmpty=isEmptyVal(field,currentMemo.fieldValues[key],key);
+    const isEmpty=isEmptyVal(field,mv[key],key);
     fhdr.classList.toggle('is-empty',isEmpty);
   }
   // セクションバッジ更新
   let emptyCount=0;
   for(const f of sec.fields){
     const k=`${sec.sectionId}_${f.fieldId}`;
-    if(isEmptyVal(f,currentMemo.fieldValues[k],k))emptyCount++;
+    if(isEmptyVal(f,mv[k],k))emptyCount++;
   }
   const badge=document.getElementById(`badge_${sid}`);
   if(badge){
@@ -813,6 +836,8 @@ function pushUndoStack(){
   if(!currentMemo)return;
   undoStack.push({
     fieldValues:JSON.parse(JSON.stringify(currentMemo.fieldValues||{})),
+    overrides:JSON.parse(JSON.stringify(currentMemo.overrides||{})),
+    timeline:JSON.parse(JSON.stringify(currentMemo.timeline||[])),
     title:currentMemo.title||''
   });
   if(undoStack.length>50)undoStack.shift();
@@ -823,10 +848,14 @@ function undoMemo(){
   if(!undoStack.length){showToast('これ以上戻れません');return;}
   redoStack.push({
     fieldValues:JSON.parse(JSON.stringify(currentMemo.fieldValues||{})),
+    overrides:JSON.parse(JSON.stringify(currentMemo.overrides||{})),
+    timeline:JSON.parse(JSON.stringify(currentMemo.timeline||[])),
     title:currentMemo.title||''
   });
   const state=undoStack.pop();
   currentMemo.fieldValues=JSON.parse(JSON.stringify(state.fieldValues));
+  currentMemo.overrides=JSON.parse(JSON.stringify(state.overrides||{}));
+  currentMemo.timeline=JSON.parse(JSON.stringify(state.timeline||[]));
   currentMemo.title=state.title;
   currentMemo.updatedAt=now();
   _userEditedSinceOpen=true;
@@ -839,10 +868,14 @@ function redoMemo(){
   if(!redoStack.length){showToast('これ以上やり直せません');return;}
   undoStack.push({
     fieldValues:JSON.parse(JSON.stringify(currentMemo.fieldValues||{})),
+    overrides:JSON.parse(JSON.stringify(currentMemo.overrides||{})),
+    timeline:JSON.parse(JSON.stringify(currentMemo.timeline||[])),
     title:currentMemo.title||''
   });
   const state=redoStack.pop();
   currentMemo.fieldValues=JSON.parse(JSON.stringify(state.fieldValues));
+  currentMemo.overrides=JSON.parse(JSON.stringify(state.overrides||{}));
+  currentMemo.timeline=JSON.parse(JSON.stringify(state.timeline||[]));
   currentMemo.title=state.title;
   currentMemo.updatedAt=now();
   _userEditedSinceOpen=true;
@@ -929,6 +962,112 @@ function applyFormatCollapseState(){
     if(hdr)hdr.classList.add('collapsed');
     if(bdy)bdy.classList.add('collapsed');
   }
+}
+
+// ===== TIMELINE（キャラ別）=====
+function getTimeline(memo){
+  return [...(memo?.timeline||[])].sort((a,b)=>(a.order??0)-(b.order??0));
+}
+// 基本設定に、指定した出来事までの上書きを順番に累積適用した値を返す
+function getMergedValues(memo,eventId){
+  const base=JSON.parse(JSON.stringify(memo.fieldValues||{}));
+  if(!eventId)return base;
+  const ov=memo.overrides||{};
+  for(const ev of getTimeline(memo)){
+    const o=ov[ev.id];
+    if(o)for(const k of Object.keys(o))base[k]=JSON.parse(JSON.stringify(o[k]));
+    if(ev.id===eventId)break;
+  }
+  return base;
+}
+// 現在の時点での値を取得 / 保存（基本なら fieldValues、時点選択中なら overrides）
+function getFV(key){
+  if(!currentMemo)return undefined;
+  if(!currentTimepoint)return currentMemo.fieldValues[key];
+  return getMergedValues(currentMemo,currentTimepoint)[key];
+}
+function setFV(key,val){
+  if(!currentMemo)return;
+  if(!currentTimepoint){currentMemo.fieldValues[key]=val;return;}
+  if(!currentMemo.overrides)currentMemo.overrides={};
+  if(!currentMemo.overrides[currentTimepoint])currentMemo.overrides[currentTimepoint]={};
+  currentMemo.overrides[currentTimepoint][key]=val;
+}
+function hasOverride(key){
+  return !!(currentMemo&&currentTimepoint&&currentMemo.overrides?.[currentTimepoint]&&(key in currentMemo.overrides[currentTimepoint]));
+}
+function clearOverride(key){
+  if(!hasOverride(key))return;
+  pushUndoStack();
+  delete currentMemo.overrides[currentTimepoint][key];
+  if(!Object.keys(currentMemo.overrides[currentTimepoint]).length)delete currentMemo.overrides[currentTimepoint];
+  onMemoChange();renderMemoDetail();
+}
+function setTimepoint(eventId){
+  currentTimepoint=eventId||null;
+  if(currentMemo)renderMemoDetail();
+}
+function timepointLabel(memo,eventId){
+  if(!eventId)return '基本';
+  const ev=(memo?.timeline||[]).find(e=>e.id===eventId);
+  return ev?ev.name+'の後':'？';
+}
+function openEventModal(id=null){
+  if(!currentMemo)return;
+  editingEventId=id;
+  const ev=id?(currentMemo.timeline||[]).find(e=>e.id===id):null;
+  document.getElementById('modal-event-title').textContent=id?'出来事を編集':'出来事を追加';
+  document.getElementById('event-name-input').value=ev?.name||'';
+  document.getElementById('event-note-input').value=ev?.note||'';
+  openModal('modal-event');
+  setTimeout(()=>document.getElementById('event-name-input').focus(),300);
+}
+function saveEvent(){
+  if(!currentMemo)return;
+  const name=document.getElementById('event-name-input').value.trim();
+  const note=document.getElementById('event-note-input').value.trim();
+  if(!name){showToast('出来事を入力してください');return;}
+  pushUndoStack();
+  const tl=getTimeline(currentMemo);
+  if(editingEventId){
+    const ev=tl.find(e=>e.id===editingEventId);
+    if(ev){ev.name=name;ev.note=note;}
+  }else{
+    if(tl.length>=50){showToast('出来事は最大50個です');return;}
+    tl.push({id:uuid(),name,note,order:tl.length});
+  }
+  tl.forEach((e,i)=>e.order=i);
+  currentMemo.timeline=tl;
+  closeModal('modal-event');
+  onMemoChange();renderMemoDetail();
+}
+function moveEvent(idx,dir){
+  if(!currentMemo)return;
+  const tl=getTimeline(currentMemo);
+  const j=idx+dir;
+  if(j<0||j>=tl.length)return;
+  pushUndoStack();
+  [tl[idx],tl[j]]=[tl[j],tl[idx]];
+  tl.forEach((e,i)=>e.order=i);
+  currentMemo.timeline=tl;
+  onMemoChange();renderMemoDetail();
+}
+function deleteEvent(id){
+  if(!currentMemo)return;
+  const ev=(currentMemo.timeline||[]).find(e=>e.id===id);
+  if(!ev)return;
+  const cnt=Object.keys(currentMemo.overrides?.[id]||{}).length;
+  confirmDialog('出来事を削除',`「${ev.name}」を削除します。`+(cnt?`\n※この時点の上書き${cnt}項目も消えます。`:''),'削除',()=>{
+    pushUndoStack();
+    const tl=getTimeline(currentMemo).filter(e=>e.id!==id);
+    tl.forEach((e,i)=>e.order=i);
+    currentMemo.timeline=tl;
+    if(currentMemo.overrides?.[id])delete currentMemo.overrides[id];
+    if(currentTimepoint===id)currentTimepoint=null;
+    if(outputTimepoint===id)outputTimepoint=null;
+    onMemoChange();renderMemoDetail();
+    showToast('削除しました');
+  });
 }
 
 // ===== GROUPS =====
@@ -1176,6 +1315,8 @@ async function duplicateMemo(memoId){
     id:newId,
     title:(src.title||'')+'_コピー',
     fieldValues:JSON.parse(JSON.stringify(src.fieldValues||{})),
+    overrides:JSON.parse(JSON.stringify(src.overrides||{})),
+    timeline:JSON.parse(JSON.stringify(src.timeline||[])),
     tags:[...(src.tags||[])],
     linkedMemos:[...(src.linkedMemos||[])],
     history:[],
@@ -1261,6 +1402,7 @@ async function openMemo(memoId){
     if(!currentMemo.history)currentMemo.history=[];
     if(!currentMemo.coverImage)currentMemo.coverImage=null;
     Object.keys(memoCollapseState).forEach(k=>delete memoCollapseState[k]);
+    if(prevMemoId!==memoId)currentTimepoint=null;
     undoStack=[];redoStack=[];
     copiedUneditedKeys=new Set(currentMemo.copiedUneditedKeys||[]);
     currentMemoId=memoId;
@@ -1302,6 +1444,9 @@ function renderMemoDetail(){
   try{
   const m=currentMemo,fmt=currentFormat,isEdit=currentMode==='edit'&&!m.locked&&isAdmin;
   if(!m.fieldValues)m.fieldValues={};
+  const events=getTimeline(m);
+  if(currentTimepoint&&!events.some(e=>e.id===currentTimepoint))currentTimepoint=null;
+  const mv=getMergedValues(m,currentTimepoint);
   let html='';
 
 
@@ -1343,6 +1488,26 @@ function renderMemoDetail(){
     ${isEdit?`<span class="badge" style="background:var(--bg-4);color:var(--text-2);border:1px solid var(--border);cursor:pointer" onclick="openFormatChangeModal()">フォーマット変更</span>`:''}
   </div>`;
 
+  // Timepoint selector（出来事がある or 編集モードなら表示）
+  if(events.length||isEdit){
+    const chips=[{id:null,name:'基本'},...events].map(ev=>{
+      const sel=(ev.id||null)===currentTimepoint;
+      const cnt=ev.id?Object.keys(m.overrides?.[ev.id]||{}).length:0;
+      return `<div class="index-chip ${sel?'selected':''}" style="white-space:nowrap;flex-shrink:0" onclick="setTimepoint(${ev.id?`'${ev.id}'`:'null'})">${esc(ev.id?ev.name+'の後':'基本')}${cnt?` <span style="opacity:0.7;font-size:11px">(${cnt})</span>`:''}</div>`;
+    }).join('');
+    const addChip=isEdit?`<div class="index-chip" style="white-space:nowrap;flex-shrink:0;border-style:dashed" onclick="openEventModal()">＋ 出来事</div>`:'';
+    const curEv=currentTimepoint?events.find(e=>e.id===currentTimepoint):null;
+    html+=`<div style="margin-bottom:16px">
+      <div style="font-size:11px;color:var(--text-2);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px">時点</div>
+      <div class="index-options" style="flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch">${chips}${addChip}</div>
+      ${curEv?`<div style="margin-top:8px;padding:8px 12px;background:rgba(224,148,64,0.08);border:1px solid rgba(224,148,64,0.3);border-radius:var(--radius-sm);font-size:12px;line-height:1.6;color:var(--text-1)">
+        <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--warning);font-weight:700;flex:1">${esc(curEv.name)}の後</span>${isEdit?`<span style="cursor:pointer;color:var(--text-2)" onclick="openEventModal('${curEv.id}')">✏</span><span style="cursor:pointer;color:var(--danger)" onclick="deleteEvent('${curEv.id}')">✕</span>`:''}</div>
+        ${curEv.note?`<div style="color:var(--text-2);margin-top:2px;white-space:pre-wrap">${esc(curEv.note)}</div>`:''}
+        ${isEdit?`<div style="color:var(--warning);margin-top:4px">編集した項目は、この時点の上書きとして保存されます</div>`:''}
+      </div>`:''}
+    </div>`;
+  }
+
   // Sections
   const sections=fmt?[...fmt.sections].sort((a,b)=>a.order-b.order):[];
   for(const sec of sections){
@@ -1357,7 +1522,7 @@ function renderMemoDetail(){
     if(isEdit){
       for(const field of sec.fields){
         const key=`${sec.sectionId}_${field.fieldId}`;
-        const val=m.fieldValues[key];
+        const val=mv[key];
         if(isEmptyVal(field,val,key))emptyCount++;
       }
     }
@@ -1367,13 +1532,42 @@ function renderMemoDetail(){
       // 閲覧者には非表示項目をスキップ
       if(!isAdmin && field.viewerVisible===false) continue;
       const key=`${sec.sectionId}_${field.fieldId}`;
-      const val=m.fieldValues[key];
+      const val=mv[key];
       const expBadge=field.exportable&&field.type!=='image'?`<span class="badge badge-export" style="font-size:9px;padding:1px 5px">出力</span>`:'';
+      const ovBadge=hasOverride(key)?`<span class="badge" style="font-size:9px;padding:1px 5px;background:rgba(224,148,64,0.15);color:var(--warning);border:1px solid rgba(224,148,64,0.3)">上書き</span>${isEdit?`<span onclick="clearOverride('${key}')" style="font-size:10px;color:var(--text-2);cursor:pointer;margin-left:2px" title="上書きを解除して前の時点に戻す">解除</span>`:''}`:'';
       const isEmpty=isEdit&&isEmptyVal(field,val,key);
       const emptyClass=isEmpty?' is-empty':'';
-      html+=`<div class="field-block"><div class="field-block-header${emptyClass}" id="fhdr_${key}">${esc(field.name)} ${expBadge}</div><div class="field-block-body">${renderFieldBody(field,val,key,isEdit)}</div></div>`;
+      html+=`<div class="field-block"><div class="field-block-header${emptyClass}" id="fhdr_${key}">${esc(field.name)} ${expBadge}${ovBadge}</div><div class="field-block-body">${renderFieldBody(field,val,key,isEdit)}</div></div>`;
     }
     html+=`</div></div>`;
+  }
+
+  // Timeline list
+  if(events.length||isEdit){
+    html+=`<div class="section-block"><div class="section-label" id="lbl_timeline" onclick="toggleSection('timeline')" style="color:var(--warning)"><span class="section-label-arrow">▸</span>出来事タイムライン <span style="font-weight:400;color:var(--text-2)">${events.length}件</span></div><div class="section-fields" id="fld_timeline"><div class="field-block"><div class="field-block-body">`;
+    if(!events.length){
+      html+=`<span style="color:var(--text-2);font-size:13px">まだ出来事がありません。「＋ 出来事」から追加してください。</span>`;
+    }else{
+      html+=events.map((ev,i)=>{
+        const cnt=Object.keys(m.overrides?.[ev.id]||{}).length;
+        const acts=isEdit?`<div style="display:flex;gap:3px;flex-shrink:0">
+          <button class="btn-icon" style="width:26px;height:26px;font-size:11px" onclick="openEventModal('${ev.id}')">✏</button>
+          <button class="btn-icon" style="width:26px;height:26px;font-size:11px${i===0?';opacity:0.2;pointer-events:none':''}" onclick="moveEvent(${i},-1)">↑</button>
+          <button class="btn-icon" style="width:26px;height:26px;font-size:11px${i===events.length-1?';opacity:0.2;pointer-events:none':''}" onclick="moveEvent(${i},1)">↓</button>
+          <button class="btn-icon" style="width:26px;height:26px;font-size:11px;color:var(--danger)" onclick="deleteEvent('${ev.id}')">✕</button>
+        </div>`:'';
+        return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="width:24px;height:24px;border-radius:50%;background:var(--accent-glow);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px">${i+1}</div>
+          <div style="flex:1;min-width:0;cursor:pointer" onclick="setTimepoint('${ev.id}')">
+            <div style="font-size:14px;font-weight:500">${esc(ev.name)}${cnt?`<span style="font-size:10px;color:var(--warning);margin-left:6px">上書き ${cnt}</span>`:''}</div>
+            ${ev.note?`<div style="font-size:12px;color:var(--text-2);line-height:1.6;white-space:pre-wrap;margin-top:2px">${esc(ev.note)}</div>`:''}
+          </div>
+          ${acts}
+        </div>`;
+      }).join('');
+    }
+    if(isEdit)html+=`<button class="btn btn-secondary btn-sm btn-full" style="margin-top:8px" onclick="openEventModal()">＋ 出来事を追加</button>`;
+    html+=`</div></div></div></div>`;
   }
 
   // Linked memos
@@ -1494,7 +1688,7 @@ function onMemoChange(){
 function onFieldChange(key,value){
   if(!currentMemo)return;
   pushUndoStack();
-  currentMemo.fieldValues[key]=value;
+  setFV(key,value);
   // 編集したら未設定扱いを解除
   if(copiedUneditedKeys.has(key)){
     copiedUneditedKeys.delete(key);
@@ -1507,10 +1701,10 @@ function onFieldChange(key,value){
 function toggleIndex(key,option,multiSelect){
   if(!currentMemo)return;
   pushUndoStack();
-  let val=currentMemo.fieldValues[key]||[];
+  let val=getFV(key)||[];
   if(!Array.isArray(val))val=[];
   val=multiSelect?(val.includes(option)?val.filter(v=>v!==option):[...val,option]):(val.includes(option)?[]:[option]);
-  currentMemo.fieldValues[key]=val;
+  setFV(key,val);
   if(copiedUneditedKeys.has(key)){
     copiedUneditedKeys.delete(key);
     currentMemo.copiedUneditedKeys=(currentMemo.copiedUneditedKeys||[]).filter(k=>k!==key);
@@ -1523,10 +1717,10 @@ function toggleIndex(key,option,multiSelect){
 function onListItemChange(key,idx,field,value){
   if(!currentMemo)return;
   pushUndoStack();
-  const items=[...(currentMemo.fieldValues[key]||[])];
+  const items=[...(getFV(key)||[])];
   if(!items[idx])items[idx]={name:'',text:''};
   items[idx]={...items[idx],[field]:value};
-  currentMemo.fieldValues[key]=items;
+  setFV(key,items);
   if(copiedUneditedKeys.has(key)){
     copiedUneditedKeys.delete(key);
     currentMemo.copiedUneditedKeys=(currentMemo.copiedUneditedKeys||[]).filter(k=>k!==key);
@@ -1537,28 +1731,28 @@ function onListItemChange(key,idx,field,value){
 function addListItem(key){
   if(!currentMemo)return;
   pushUndoStack();
-  const items=[...(currentMemo.fieldValues[key]||[])];
+  const items=[...(getFV(key)||[])];
   if(items.length>=100){showToast('上限100個です');return;}
-  items.push({name:'',text:''});currentMemo.fieldValues[key]=items;
+  items.push({name:'',text:''});setFV(key,items);
   updateEmptyUI(key);
   onMemoChange();renderMemoDetail();
   setTimeout(()=>{const inputs=document.querySelectorAll('.list-item-block input');if(inputs.length)inputs[inputs.length-1].focus();},100);
 }
 function moveListItem(key,idx,dir){
   if(!currentMemo)return;
-  const items=[...(currentMemo.fieldValues[key]||[])];
+  const items=[...(getFV(key)||[])];
   const j=idx+dir;
   if(j<0||j>=items.length)return;
   [items[idx],items[j]]=[items[j],items[idx]];
-  currentMemo.fieldValues[key]=items;
+  setFV(key,items);
   onMemoChange();
   renderMemoDetail();
 }
 function removeListItem(key,idx){
   if(!currentMemo)return;
   pushUndoStack();
-  const items=[...(currentMemo.fieldValues[key]||[])];items.splice(idx,1);
-  currentMemo.fieldValues[key]=items;
+  const items=[...(getFV(key)||[])];items.splice(idx,1);
+  setFV(key,items);
   updateEmptyUI(key);
   onMemoChange();renderMemoDetail();
 }
@@ -1665,7 +1859,7 @@ async function handleImageFiles(e){
   const files=Array.from(e.target.files);e.target.value='';
   if(!files.length||!currentMemo||!pendingImageKey)return;
   const key=pendingImageKey;
-  const existing=Array.isArray(currentMemo.fieldValues[key])?currentMemo.fieldValues[key]:[];
+  const _cur=getFV(key);const existing=Array.isArray(_cur)?_cur:[];
   const remaining=20-existing.length;
   if(remaining<=0){showToast('画像は最大20枚です');return;}
   showToast('画像を処理中...');
@@ -1682,7 +1876,7 @@ async function handleImageFiles(e){
       return;
     }
   }
-  currentMemo.fieldValues[key]=[...existing,...newImgs];
+  setFV(key,[...existing,...newImgs]);
   _userEditedSinceOpen=true; // 競合防止フラグ
   if(copiedUneditedKeys.has(key)){
     copiedUneditedKeys.delete(key);
@@ -1716,8 +1910,8 @@ function fileToBase64(file){
 function removeImage(key,idx){
   if(!currentMemo)return;
   pushUndoStack();
-  const imgs=[...(currentMemo.fieldValues[key]||[])];imgs.splice(idx,1);
-  currentMemo.fieldValues[key]=imgs;
+  const imgs=[...(getFV(key)||[])];imgs.splice(idx,1);
+  setFV(key,imgs);
   if(copiedUneditedKeys.has(key)){
     copiedUneditedKeys.delete(key);
     currentMemo.copiedUneditedKeys=(currentMemo.copiedUneditedKeys||[]).filter(k=>k!==key);
@@ -1726,7 +1920,7 @@ function removeImage(key,idx){
   saveMemoNow();renderMemoDetail();
 }
 function openLightbox(key,idx){
-  lightboxImages=currentMemo?(currentMemo.fieldValues[key]||[]):[];
+  lightboxImages=currentMemo?(getFV(key)||[]):[];
   lightboxIdx=idx;
   document.getElementById('lightbox-img').src=lightboxImages[idx]||'';
   document.getElementById('lightbox').classList.add('active');
@@ -1778,6 +1972,8 @@ async function copyToMemo(targetId){
       const copied={
         ...target,
         fieldValues:JSON.parse(JSON.stringify(currentMemo.fieldValues||{})),
+        overrides:JSON.parse(JSON.stringify(currentMemo.overrides||{})),
+        timeline:JSON.parse(JSON.stringify(currentMemo.timeline||[])),
         tags:[...(currentMemo.tags||[])],
         coverImage:currentMemo.coverImage||null,
         copiedUneditedKeys:Object.keys(currentMemo.fieldValues||{}),
@@ -1909,8 +2105,35 @@ function openOutputModal(){
   if(!currentMemo||!currentFormat)return;
   currentOutputTab='format';
   customChecked={};
+  outputTimepoint=currentTimepoint;
+  renderOutputTimepointSelector();
   switchOutputTab('format');
   openModal('modal-output');
+}
+function renderOutputTimepointSelector(){
+  const w=document.getElementById('out-timepoint-wrap');
+  if(!w)return;
+  const events=getTimeline(currentMemo);
+  if(!events.length){w.innerHTML='';return;}
+  w.innerHTML=`<div style="margin-bottom:10px">
+    <label style="font-size:11px;color:var(--text-2);letter-spacing:0.06em;text-transform:uppercase;display:block;margin-bottom:6px">時点</label>
+    <select class="field-select" id="out-timepoint-select" onchange="onOutputTimepointChange()" style="font-size:13px;padding:8px 10px">
+      <option value="">基本</option>
+      ${events.map(e=>`<option value="${e.id}" ${e.id===outputTimepoint?'selected':''}>${esc(e.name)}の後</option>`).join('')}
+    </select>
+  </div>`;
+}
+function onOutputTimepointChange(){
+  const sel=document.getElementById('out-timepoint-select');
+  outputTimepoint=sel&&sel.value?sel.value:null;
+  customChecked={};
+  switchOutputTab(currentOutputTab);
+}
+function outputTimepointHeader(){
+  if(!outputTimepoint)return '';
+  const ev=(currentMemo.timeline||[]).find(e=>e.id===outputTimepoint);
+  if(!ev)return '';
+  return `【時点】${ev.name}の後`+(ev.note?`\n${ev.note}`:'')+`\n\n`;
 }
 
 function switchOutputTab(tab){
@@ -1975,13 +2198,14 @@ function onOutputSetChange(){
 
 function buildOutput(mode,setIdx=null){
   const m=currentMemo;
+  const mv=getMergedValues(m,outputTimepoint);
   let out='';
   const set=setIdx!==null?(currentFormat.outputSets||[])[setIdx]:null;
   for(const sec of[...currentFormat.sections].sort((a,b)=>a.order-b.order)){
     let secOut='';
     const fields=[...sec.fields].sort((a,b)=>a.order-b.order).filter(f=>f.type!=='image');
     for(const field of fields){
-      const key=`${sec.sectionId}_${field.fieldId}`,val=m.fieldValues[key];
+      const key=`${sec.sectionId}_${field.fieldId}`,val=mv[key];
       if(mode==='format'){
         if(set){
           if(!set.fieldKeys.includes(key))continue;
@@ -1995,6 +2219,7 @@ function buildOutput(mode,setIdx=null){
     if(secOut)out+=`■ ${sec.name}\n${secOut}\n`;
   }
   let result=out.trim();
+  if(result)result=outputTimepointHeader()+result;
   // 語頭・語尾を追加
   if(set){
     if(set.useHeader&&set.header&&set.header.trim())result=set.header.trim()+'\n\n'+result;
@@ -2005,6 +2230,7 @@ function buildOutput(mode,setIdx=null){
 
 function buildCustomOutput(){
   const m=currentMemo;
+  const mv=getMergedValues(m,outputTimepoint);
   let out='';
   for(const sec of[...currentFormat.sections].sort((a,b)=>a.order-b.order)){
     let secOut='';
@@ -2012,13 +2238,15 @@ function buildCustomOutput(){
     for(const field of fields){
       const key=`${sec.sectionId}_${field.fieldId}`;
       if(!customChecked[key])continue;
-      const val=m.fieldValues[key];
+      const val=mv[key];
       let text=getFieldText(field,val,key);
       if(text)secOut+=`【${field.name}】\n${text}\n`;
     }
     if(secOut)out+=`■ ${sec.name}\n${secOut}\n`;
   }
-  return out.trim();
+  let result=out.trim();
+  if(result)result=outputTimepointHeader()+result;
+  return result;
 }
 
 function getFieldText(field,val,key){
@@ -2037,13 +2265,14 @@ function getFieldText(field,val,key){
 function renderCustomSelector(){
   const el=document.getElementById('out-custom-list');
   const sections=[...currentFormat.sections].sort((a,b)=>a.order-b.order);
+  const mv=getMergedValues(currentMemo,outputTimepoint);
   // 初期化: 未設定でないものはデフォルトチェック
   if(!Object.keys(customChecked).length){
     for(const sec of sections){
       for(const f of sec.fields){
         if(f.type==='image')continue;
         const key=`${sec.sectionId}_${f.fieldId}`;
-        const val=currentMemo.fieldValues[key];
+        const val=mv[key];
         customChecked[key]=!isEmptyVal(f,val,key);
       }
     }
@@ -2056,7 +2285,7 @@ function renderCustomSelector(){
     const fieldItems=fields.map(f=>{
       const key=`${sec.sectionId}_${f.fieldId}`;
       const checked=customChecked[key]?'checked':'';
-      const isEmpty=isEmptyVal(f,currentMemo.fieldValues[key],key);
+      const isEmpty=isEmptyVal(f,mv[key],key);
       const emptyMark=isEmpty?`<span style="font-size:10px;color:var(--text-2);margin-left:4px">未設定</span>`:'';
       return`<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg-2)" onclick="toggleCustomField('${key}','${sec.sectionId}')">
         <div style="width:18px;height:18px;border-radius:4px;border:2px solid ${checked?'var(--accent)':'var(--border-light)'};background:${checked?'var(--accent)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -3173,8 +3402,8 @@ async function changeMemoId(){
 // ===== BACKUP =====
 function openBackupModal(){openModal('modal-backup');}
 async function exportData(){
-  const[groups,formats,memos]=await Promise.all([fbGetAll('groups'),fbGetAll('formats'),fbGetAll('memos')]);
-  const blob=new Blob([JSON.stringify({version:3,exportedAt:now(),groups,formats,memos},null,2)],{type:'application/json'});
+  const[groups,formats,memos,folders]=await Promise.all([fbGetAll('groups'),fbGetAll('formats'),fbGetAll('memos'),fbGetAll('folders')]);
+  const blob=new Blob([JSON.stringify({version:4,exportedAt:now(),groups,formats,memos,folders},null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');
   a.href=url;a.download=`charamemo_${new Date().toISOString().slice(0,10)}.json`;a.click();
   URL.revokeObjectURL(url);showToast('エクスポートしました');
@@ -3191,10 +3420,12 @@ async function handleImportFile(e){
         for(const g of await fbGetAll('groups'))await fbDelete('groups',g.id);
         for(const f of await fbGetAll('formats'))await fbDelete('formats',f.id);
         for(const m of await fbGetAll('memos'))await fbDelete('memos',m.id);
+        for(const f of await fbGetAll('folders'))await fbDelete('folders',f.id);
       }
       for(const g of data.groups)await fbPut('groups',g);
       for(const f of data.formats)await fbPut('formats',f);
       for(const m of data.memos)await fbPut('memos',m);
+      for(const f of (data.folders||[]))await fbPut('folders',f);
       closeModal('modal-backup');showToast('インポートしました');loadGroups();
     });
   }catch(err){showToast('インポートに失敗: '+err.message);}
